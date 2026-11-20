@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>歡樂釣魚大冒險 🎣</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="game-container">
+    <!-- Main Ocean Canvas -->
+    <canvas id="ocean-canvas"></canvas>
+
+    <!-- Top Arcade HUD -->
+    <header id="hud-top">
+      <div class="hud-left">
+        <div class="pill-badge star-badge" id="star-display" aria-label="星星數量">
+          <span class="badge-icon">⭐</span>
+          <span id="star-count">0</span>
+        </div>
+        <button class="arcade-btn album-btn" id="btn-album" aria-label="我的魚缸圖鑑">
+          <span class="btn-icon">🐠</span>
+          <span class="btn-label" id="album-progress">0/12</span>
+        </button>
+      </div>
+
+      <div class="hud-center">
+        <div id="fever-bar-wrap" class="fever-bar-wrap" title="彩虹派對能量">
+          <span class="fever-icon">🌈</span>
+          <div class="fever-track">
+            <div id="fever-fill" class="fever-fill"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hud-right">
+        <button class="arcade-btn icon-btn" id="btn-motion" title="體感甩竿開關" aria-label="體感開關">
+          <span class="btn-icon">📱</span>
+        </button>
+        <button class="arcade-btn icon-btn active" id="btn-sound" title="音效開關" aria-label="音效開關">
+          <span class="btn-icon">🔊</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Dynamic Floating Event Banner (BITE! / BOSS! / FEVER!) -->
+    <div id="event-banner" class="event-banner hidden">
+      <div class="banner-text" id="event-banner-text">咬鉤了！</div>
+    </div>
+
+    <!-- Contextual Visual Hint for 4yo (No reading required!) -->
+    <div id="cast-hint" class="cast-hint">
+      <div class="hint-bubble">
+        <span class="hint-finger">👆</span>
+        <span class="hint-text">點水面拋竿！</span>
+      </div>
+    </div>
+
+    <!-- Bottom Arcade Controls (Reeling & Zap!) -->
+    <div id="arcade-controls" class="arcade-controls hidden">
+      <!-- Progress Bar showing how close the fish is -->
+      <div class="reel-progress-wrap">
+        <span class="reel-fish-icon">🐟</span>
+        <div class="reel-progress-track">
+          <div id="reel-progress-fill" class="reel-progress-fill"></div>
+        </div>
+        <span class="reel-bucket-icon">🪣</span>
+      </div>
+
+      <div class="controls-row">
+        <!-- Giant Electric Shock / Super Power Button (Ace Angler style!) -->
+        <button id="btn-zap" class="zap-btn" aria-label="閃電必殺技">
+          <div class="zap-ring"></div>
+          <span class="zap-icon">⚡</span>
+          <span class="zap-label">閃電！</span>
+          <div class="zap-charge-bar">
+            <div id="zap-charge-fill" class="zap-charge-fill"></div>
+          </div>
+        </button>
+
+        <!-- Giant Tactile Fishing Reel Crank (Spin OR Tap!) -->
+        <div id="reel-crank-zone" class="reel-crank-zone" aria-label="轉動捲線器">
+          <div class="reel-outer-ring">
+            <div class="reel-arrows">↻</div>
+            <div id="reel-wheel" class="reel-wheel">
+              <div class="reel-spoke spoke-1"></div>
+              <div class="reel-spoke spoke-2"></div>
+              <div class="reel-center-cap">🎣</div>
+              <div id="reel-knob" class="reel-knob"></div>
+            </div>
+          </div>
+          <div class="reel-hint-tag">轉轉轉！</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Big Catch Celebration Overlay -->
+    <div id="catch-modal" class="modal-overlay hidden">
+      <div class="catch-card">
+        <div class="catch-rays"></div>
+        <div class="catch-stars" id="catch-stars">⭐⭐⭐</div>
+        <div class="catch-badge hidden" id="catch-new-badge">✨ 新發現！</div>
+        <canvas id="catch-fish-canvas" width="260" height="200"></canvas>
+        <h2 class="catch-title" id="catch-name">小丑魚</h2>
+        <p class="catch-subtitle" id="catch-fun-line">好棒喔！</p>
+        <div class="catch-reward">
+          <span>+</span><span id="catch-reward-stars">10</span><span> ⭐</span>
+        </div>
+        <button id="btn-catch-ok" class="big-play-btn">繼續釣魚！🎣</button>
+      </div>
+    </div>
+
+    <!-- Fish Album / My Aquarium Modal -->
+    <div id="album-modal" class="modal-overlay hidden">
+      <div class="album-card">
+        <div class="album-header">
+          <h2>🐠 我的海洋圖鑑</h2>
+          <button id="btn-album-close" class="arcade-btn close-btn" aria-label="關閉">✖</button>
+        </div>
+        <div class="album-grid" id="album-grid"></div>
+      </div>
+    </div>
+
+    <!-- Welcome / Start Screen (Unlocks Web Audio & sets playful arcade mood) -->
+    <div id="start-screen" class="start-screen">
+      <div class="start-card">
+        <div class="start-logo-wrap">
+          <div class="start-fish-bounce">🐠</div>
+          <div class="start-rod-wave">🎣</div>
+        </div>
+        <h1 class="start-title">歡樂釣魚大冒險</h1>
+        <p class="start-desc">點水面拋竿・轉轉捲線器・放閃電釣大魚！</p>
+        <button id="btn-start-game" class="big-play-btn pulse-btn">
+          <span>▶ 開始釣魚！</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/audio.js"></script>
+  <script src="js/fishData.js"></script>
+  <script src="js/particles.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
