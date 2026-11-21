@@ -31,6 +31,9 @@
   const eventBannerTextEl = document.getElementById('event-banner-text');
 
   const idleControlsEl = document.getElementById('idle-controls');
+  const btnStageSwitch = document.getElementById('btn-stage-switch');
+  const stageIconEl = document.getElementById('stage-icon');
+  const stageNameEl = document.getElementById('stage-name');
   const rodTagEl = document.getElementById('rod-tag');
   const btnBigCast = document.getElementById('btn-big-cast');
 
@@ -65,12 +68,43 @@
   const parentModalEl = document.getElementById('parent-modal');
   const btnParentClose = document.getElementById('btn-parent-close');
   const btnToggleSound = document.getElementById('btn-toggle-sound');
+  const btnToggleBgm = document.getElementById('btn-toggle-bgm');
   const btnToggleVoice = document.getElementById('btn-toggle-voice');
   const btnToggleMotion = document.getElementById('btn-toggle-motion');
   const btnResetSave = document.getElementById('btn-reset-save');
 
   const startScreenEl = document.getElementById('start-screen');
   const btnStartGame = document.getElementById('btn-start-game');
+
+  // 3 Interactive Ocean Stages!
+  const STAGES = [
+    {
+      id: 'coral',
+      icon: '🏝️',
+      name: '陽光珊瑚海',
+      sky: ['#4fc3f7', '#b3e5fc'],
+      sea: ['#29b6f6', '#0288d1', '#01579b'],
+      boostIds: ['clownfish', 'turtle', 'blue_tang']
+    },
+    {
+      id: 'sunset',
+      icon: '🌅',
+      name: '夕陽黃金灣',
+      sky: ['#ff8a65', '#ffe082'],
+      sea: ['#26c6da', '#00838f', '#004d40'],
+      boostIds: ['goldfish', 'jellyfish', 'treasure']
+    },
+    {
+      id: 'starry',
+      icon: '🌌',
+      name: '星空深海樂園',
+      sky: ['#1a237e', '#4a148c'],
+      sea: ['#3949ab', '#1a237e', '#0d1033'],
+      boostIds: ['narwhal', 'baby_shark', 'jellyfish'],
+      starrySky: true
+    }
+  ];
+  let currentStageIdx = 0;
 
   // Fisher Ranks & Auto-Upgrading Fishing Rods!
   const RANKS = [
@@ -197,15 +231,18 @@
 
   // ---------------- Fish Spawning ----------------
   function pickRandomFishDef() {
+    const stage = STAGES[currentStageIdx];
     const pool = window.FISH_CATALOG.filter((f) => !f.isBoss);
-    const totalWeight = pool.reduce((sum, f) => {
-      const bonus = feverTimer > 0 && f.rarity >= 2 ? f.weight * 2.5 : f.weight;
-      return sum + bonus;
-    }, 0);
+    const weightOf = (f) => {
+      let w = f.weight;
+      if (feverTimer > 0 && f.rarity >= 2) w *= 2.5;
+      if (stage.boostIds.includes(f.id)) w *= 1.8;
+      return w;
+    };
+    const totalWeight = pool.reduce((sum, f) => sum + weightOf(f), 0);
     let r = Math.random() * totalWeight;
     for (const f of pool) {
-      const bonus = feverTimer > 0 && f.rarity >= 2 ? f.weight * 2.5 : f.weight;
-      r -= bonus;
+      r -= weightOf(f);
       if (r <= 0) return f;
     }
     return pool[0];
@@ -258,6 +295,7 @@
   function triggerFeverMode() {
     feverTimer = 16;
     feverCharge = 100;
+    window.arcadeAudio.setBgmFever(true);
     feverBorderEl.classList.remove('hidden');
     feverBarWrapEl.classList.add('active');
     feverX2TagEl.classList.remove('hidden');
@@ -396,9 +434,10 @@
     }
 
     // Celebration particles & Flying Stars into HUD!
-    particles.addSplash(caught.x, waterSurfaceY + 10, 32, '#ffffff');
-    particles.addConfetti(width / 2, height * 0.42, def.isBoss ? 90 : 55);
-    particles.addFlyingStars(width / 2, height * 0.45, 70, 34, def.isBoss ? 12 : 6);
+    const isTreasure = def.id === 'treasure';
+    particles.addSplash(caught.x, waterSurfaceY + 10, isTreasure ? 48 : 32, isTreasure ? '#fff176' : '#ffffff');
+    particles.addConfetti(width / 2, height * 0.42, (def.isBoss || isTreasure) ? 95 : 55);
+    particles.addFlyingStars(width / 2, height * 0.45, 70, 34, (def.isBoss || isTreasure) ? 14 : 6);
 
     // Update Save & Check Rank Up!
     const oldRankIdx = getRankIndex(saveState.stars);
@@ -428,7 +467,11 @@
         window.arcadeAudio.speak(`哇！太棒了！你升級成${nr.title}，拿到新釣竿囉！`);
       }, 450);
     } else {
-      window.arcadeAudio.playCatchFanfare(def.rarity >= 3);
+      if (def.id === 'treasure') {
+        window.arcadeAudio.playTreasureJackpot();
+      } else {
+        window.arcadeAudio.playCatchFanfare(def.rarity >= 3);
+      }
       setTimeout(() => {
         window.arcadeAudio.speak(def.voiceLine);
       }, 350);
@@ -568,6 +611,17 @@
 
       if (unlocked) {
         card.addEventListener('click', () => {
+          card.classList.remove('happy-hop');
+          void card.offsetWidth;
+          card.classList.add('happy-hop');
+          setTimeout(() => card.classList.remove('happy-hop'), 320);
+
+          const heart = document.createElement('span');
+          heart.className = 'album-heart';
+          heart.textContent = '❤️';
+          card.appendChild(heart);
+          setTimeout(() => heart.remove(), 750);
+
           window.arcadeAudio.playCreatureGiggle();
           window.arcadeAudio.speak(`${def.name}！${def.funLine}`);
         });
@@ -614,6 +668,9 @@
     btnToggleSound.classList.toggle('active', window.arcadeAudio.enabled);
     btnToggleSound.querySelector('.opt-state').textContent = window.arcadeAudio.enabled ? '開啟' : '關閉';
 
+    btnToggleBgm.classList.toggle('active', window.arcadeAudio.bgmEnabled);
+    btnToggleBgm.querySelector('.opt-state').textContent = window.arcadeAudio.bgmEnabled ? '開啟' : '關閉';
+
     btnToggleVoice.classList.toggle('active', window.arcadeAudio.voiceEnabled);
     btnToggleVoice.querySelector('.opt-state').textContent = window.arcadeAudio.voiceEnabled ? '開啟' : '關閉';
 
@@ -642,6 +699,11 @@
 
   btnToggleSound.addEventListener('click', () => {
     window.arcadeAudio.toggleSound();
+    syncParentButtons();
+  });
+
+  btnToggleBgm.addEventListener('click', () => {
+    window.arcadeAudio.toggleBgm();
     syncParentButtons();
   });
 
@@ -693,6 +755,11 @@
       return;
     }
 
+    if (particles.tryTapStarfish(px, py, height, width)) {
+      window.arcadeAudio.playBubblePop();
+      return;
+    }
+
     for (const f of fishes) {
       const dx = px - f.x;
       const dy = py - f.y;
@@ -725,6 +792,21 @@
       castLine(px, waterSurfaceY + 80 + Math.random() * (height * 0.45));
     }
     swipeStart = null;
+  });
+
+  // Stage Switcher Button (3 Ocean Themes!)
+  btnStageSwitch.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    window.arcadeAudio.unlock();
+    currentStageIdx = (currentStageIdx + 1) % STAGES.length;
+    const st = STAGES[currentStageIdx];
+    stageIconEl.textContent = st.icon;
+    stageNameEl.textContent = st.name;
+    window.arcadeAudio.playFeverStart();
+    particles.addConfetti(width * 0.2, height * 0.78, 22);
+    showBanner(`${st.icon} 來到 ${st.name}！`, '', 2.0);
+    window.arcadeAudio.speak(`出發！來到${st.name}囉！`);
+    populateOcean();
   });
 
   // Giant Pulsing Cast Button
@@ -848,6 +930,7 @@
   btnStartGame.addEventListener('click', () => {
     window.arcadeAudio.unlock();
     window.arcadeAudio.playFeverStart();
+    window.arcadeAudio.startBgm();
     startScreenEl.classList.add('hidden');
     started = true;
     setTimeout(() => {
@@ -889,6 +972,7 @@
       if (feverTimer <= 0) {
         feverCharge = 0;
         feverFillEl.style.width = '0%';
+        window.arcadeAudio.setBgmFever(false);
         feverBorderEl.classList.add('hidden');
         feverBarWrapEl.classList.remove('active');
         feverX2TagEl.classList.add('hidden');
@@ -1036,26 +1120,40 @@
 
   // ---------------- Render Loop ----------------
   function drawWaterBackground() {
+    const stage = STAGES[currentStageIdx];
     const skyGrad = ctx.createLinearGradient(0, 0, 0, waterSurfaceY);
     if (feverTimer > 0) {
       skyGrad.addColorStop(0, '#ff80ab');
       skyGrad.addColorStop(1, '#ffe082');
     } else {
-      skyGrad.addColorStop(0, '#4fc3f7');
-      skyGrad.addColorStop(1, '#b3e5fc');
+      skyGrad.addColorStop(0, stage.sky[0]);
+      skyGrad.addColorStop(1, stage.sky[1]);
     }
     ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, width, waterSurfaceY + 12);
 
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.78)';
-    for (let i = 0; i < 3; i++) {
-      const cx = ((time * 14 + i * (width / 2.6)) % (width + 180)) - 90;
-      const cy = waterSurfaceY * 0.42 + (i % 2) * 12;
-      ctx.beginPath();
-      ctx.arc(cx, cy, 22, 0, Math.PI * 2);
-      ctx.arc(cx + 20, cy - 6, 26, 0, Math.PI * 2);
-      ctx.arc(cx + 42, cy, 20, 0, Math.PI * 2);
-      ctx.fill();
+    if (stage.starrySky && feverTimer <= 0) {
+      // Twinkling stars in Starry Sea!
+      ctx.fillStyle = '#fff59d';
+      for (let i = 0; i < 16; i++) {
+        const sx = ((i * 137) % Math.max(1, width));
+        const sy = 14 + ((i * 53) % Math.max(20, waterSurfaceY - 24));
+        const r = 1.5 + Math.abs(Math.sin(time * 2.5 + i)) * 2.2;
+        ctx.beginPath();
+        ctx.arc(sx, sy, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.78)';
+      for (let i = 0; i < 3; i++) {
+        const cx = ((time * 14 + i * (width / 2.6)) % (width + 180)) - 90;
+        const cy = waterSurfaceY * 0.42 + (i % 2) * 12;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 22, 0, Math.PI * 2);
+        ctx.arc(cx + 20, cy - 6, 26, 0, Math.PI * 2);
+        ctx.arc(cx + 42, cy, 20, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
     const seaGrad = ctx.createLinearGradient(0, waterSurfaceY, 0, height);
@@ -1064,9 +1162,9 @@
       seaGrad.addColorStop(0.5, '#7c4dff');
       seaGrad.addColorStop(1, '#1a237e');
     } else {
-      seaGrad.addColorStop(0, '#29b6f6');
-      seaGrad.addColorStop(0.55, '#0288d1');
-      seaGrad.addColorStop(1, '#01579b');
+      seaGrad.addColorStop(0, stage.sea[0]);
+      seaGrad.addColorStop(0.55, stage.sea[1]);
+      seaGrad.addColorStop(1, stage.sea[2]);
     }
     ctx.fillStyle = seaGrad;
     ctx.fillRect(0, waterSurfaceY, width, height - waterSurfaceY);

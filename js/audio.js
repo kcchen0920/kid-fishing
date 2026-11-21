@@ -8,6 +8,10 @@ class ArcadeAudio {
     this.ctx = null;
     this.enabled = true;
     this.voiceEnabled = true;
+    this.bgmEnabled = true;
+    this.bgmTimer = null;
+    this.bgmStep = 0;
+    this.bgmFever = false;
     this.lastReelSoundTime = 0;
   }
 
@@ -40,6 +44,55 @@ class ArcadeAudio {
       window.speechSynthesis.cancel();
     }
     return this.voiceEnabled;
+  }
+
+  toggleBgm() {
+    this.bgmEnabled = !this.bgmEnabled;
+    if (this.bgmEnabled) {
+      this.unlock();
+      this.startBgm();
+    } else {
+      this.stopBgm();
+    }
+    return this.bgmEnabled;
+  }
+
+  startBgm() {
+    if (this.bgmTimer) return;
+    // Cheerful, gentle pentatonic toy-marimba melody!
+    const notes = [523.25, 659.25, 783.99, 659.25, 587.33, 659.25, 523.25, 392.0,
+                   440.0, 523.25, 659.25, 783.99, 880.0, 783.99, 659.25, 523.25];
+    const tick = () => {
+      if (this.enabled && this.bgmEnabled && this.ctx && this.ctx.state === 'running') {
+        const freq = notes[this.bgmStep % notes.length] * (this.bgmFever ? 1.122 : 1.0);
+        this.playTone(freq, 0.22, 'sine', 0.048);
+        if (this.bgmStep % 4 === 0) {
+          this.playTone(freq * 0.5, 0.3, 'triangle', 0.035);
+        }
+        this.bgmStep++;
+      }
+      this.bgmTimer = setTimeout(tick, this.bgmFever ? 250 : 380);
+    };
+    tick();
+  }
+
+  stopBgm() {
+    if (this.bgmTimer) {
+      clearTimeout(this.bgmTimer);
+      this.bgmTimer = null;
+    }
+  }
+
+  setBgmFever(active) {
+    this.bgmFever = active;
+  }
+
+  playTreasureJackpot() {
+    const coins = [784, 988, 1175, 1319, 1568, 1319, 1568, 2093];
+    coins.forEach((f, i) => {
+      this.playTone(f, 0.16, 'triangle', 0.2, null, i * 0.065);
+    });
+    this.vibrate([50, 30, 50, 30, 140]);
   }
 
   vibrate(pattern) {

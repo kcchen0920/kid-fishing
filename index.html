@@ -81,9 +81,15 @@
       <div class="banner-text" id="event-banner-text">咬鉤了！</div>
     </div>
 
-    <!-- Idle Cast Controls: Visual Hint + Giant Pulsing Cast Button -->
+    <!-- Idle Cast Controls: Stage Switcher + Rod Tag + Giant Pulsing Cast Button -->
     <div id="idle-controls" class="idle-controls">
-      <div class="rod-tag" id="rod-tag">🪵 木頭小釣竿</div>
+      <div class="idle-left-stack">
+        <button id="btn-stage-switch" class="arcade-btn stage-btn" aria-label="切換海洋地圖">
+          <span id="stage-icon">🏝️</span>
+          <span id="stage-name">陽光珊瑚海</span>
+        </button>
+        <div class="rod-tag" id="rod-tag">🪵 木頭小釣竿</div>
+      </div>
       <button id="btn-big-cast" class="big-cast-btn" aria-label="拋竿釣魚">
         <span class="cast-btn-icon">🎣</span>
         <span class="cast-btn-label">拋竿！</span>
@@ -168,6 +174,10 @@
         <div class="parent-options">
           <button id="btn-toggle-sound" class="parent-opt-btn active">
             <span>🔊 電玩音效</span>
+            <span class="opt-state">開啟</span>
+          </button>
+          <button id="btn-toggle-bgm" class="parent-opt-btn active">
+            <span>🎵 歡樂海洋音樂</span>
             <span class="opt-state">開啟</span>
           </button>
           <button id="btn-toggle-voice" class="parent-opt-btn active">

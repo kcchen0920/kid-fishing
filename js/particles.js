@@ -21,6 +21,11 @@ class ParticleSystem {
       danceTimer: 0,
       phase: 0
     };
+    this.starfish = {
+      x: 320,
+      spinTimer: 0,
+      angle: 0
+    };
   }
 
   initScenery(width, height) {
@@ -36,6 +41,7 @@ class ParticleSystem {
       });
     }
     this.crab.x = width * 0.25;
+    this.starfish.x = width * 0.74;
 
     this.bubbles = [];
     for (let i = 0; i < 16; i++) {
@@ -194,6 +200,21 @@ class ParticleSystem {
     return false;
   }
 
+  tryTapStarfish(px, py, height, width) {
+    const sy = height - 28;
+    const dx = px - this.starfish.x;
+    const dy = py - sy;
+    if (dx * dx + dy * dy <= 48 * 48) {
+      this.starfish.spinTimer = 1.5;
+      this.addPopup(this.starfish.x, sy - 38, '⭐ 轉圈圈！', '#ffeb3b', 26);
+      for (let i = 0; i < 3; i++) {
+        this.spawnBubble(width, height, sy - 10 - i * 16);
+      }
+      return true;
+    }
+    return false;
+  }
+
   update(dt, width, height, waterSurfaceY) {
     if (this.bubbles.length < 16 && Math.random() < dt * 2.5) {
       this.spawnBubble(width, height);
@@ -268,6 +289,13 @@ class ParticleSystem {
       this.crab.x += this.crab.dir * 32 * dt;
       if (this.crab.x < 60) this.crab.dir = 1;
       if (this.crab.x > width - 60) this.crab.dir = -1;
+    }
+
+    if (this.starfish.spinTimer > 0) {
+      this.starfish.spinTimer -= dt;
+      this.starfish.angle += dt * 12;
+    } else {
+      this.starfish.angle *= Math.max(0, 1 - dt * 5);
     }
   }
 
@@ -357,6 +385,44 @@ class ParticleSystem {
     });
 
     this.drawCrab(ctx, height);
+    this.drawStarfish(ctx, height);
+  }
+
+  drawStarfish(ctx, height) {
+    const sx = this.starfish.x;
+    const hop = this.starfish.spinTimer > 0 ? Math.abs(Math.sin(this.starfish.angle * 0.5)) * 18 : 0;
+    const sy = height - 28 - hop;
+
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(this.starfish.angle);
+
+    ctx.fillStyle = '#ffab40';
+    ctx.strokeStyle = '#ff6d00';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const r = i % 2 === 0 ? 22 : 10;
+      const a = (i * Math.PI) / 5 - Math.PI / 2;
+      if (i === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+      else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Cute eyes & smile
+    ctx.fillStyle = '#3e2723';
+    ctx.beginPath();
+    ctx.arc(-5, -2, 2.5, 0, Math.PI * 2);
+    ctx.arc(5, -2, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#3e2723';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 2, 4, 0.1 * Math.PI, 0.9 * Math.PI);
+    ctx.stroke();
+    ctx.restore();
   }
 
   drawCrab(ctx, height) {
