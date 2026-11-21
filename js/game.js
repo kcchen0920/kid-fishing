@@ -1,6 +1,6 @@
 /* =========================================================
-   歡樂釣魚大冒險 - Main Arcade Fishing Game Engine
-   Designed for 4-year-olds: ultra-responsive, tactile, joyful!
+   歡樂釣魚大冒險 - Main Arcade Fishing Game Engine (v2)
+   Full UI/UX + Player Progression + Ergonomic Arcade Polish
    ========================================================= */
 
 (() => {
@@ -8,20 +8,45 @@
   const ctx = canvas.getContext('2d');
 
   // HUD & UI Elements
+  const feverBorderEl = document.getElementById('fever-border');
+  const rankDisplayEl = document.getElementById('rank-display');
+  const rankIconEl = document.getElementById('rank-icon');
+  const rankTitleEl = document.getElementById('rank-title');
+  const rankXpRingEl = document.getElementById('rank-xp-ring');
   const starCountEl = document.getElementById('star-count');
-  const starDisplayEl = document.getElementById('star-display');
+  const basketFishRowEl = document.getElementById('basket-fish-row');
   const albumProgressEl = document.getElementById('album-progress');
+
+  const feverBarWrapEl = document.getElementById('fever-bar-wrap');
   const feverFillEl = document.getElementById('fever-fill');
+  const feverX2TagEl = document.getElementById('fever-x2-tag');
+  const comboBadgeEl = document.getElementById('combo-badge');
+
+  const motionIndicatorEl = document.getElementById('motion-indicator');
+  const motionRodIconEl = document.getElementById('motion-rod-icon');
+  const btnParentSettings = document.getElementById('btn-parent-settings');
+  const parentHoldRingEl = document.getElementById('parent-hold-ring');
+
   const eventBannerEl = document.getElementById('event-banner');
   const eventBannerTextEl = document.getElementById('event-banner-text');
-  const castHintEl = document.getElementById('cast-hint');
+
+  const idleControlsEl = document.getElementById('idle-controls');
+  const rodTagEl = document.getElementById('rod-tag');
+  const btnBigCast = document.getElementById('btn-big-cast');
+
   const arcadeControlsEl = document.getElementById('arcade-controls');
   const reelProgressFillEl = document.getElementById('reel-progress-fill');
+  const tugFishSliderEl = document.getElementById('tug-fish-slider');
+  const tugFishEmojiEl = document.getElementById('tug-fish-emoji');
+  const tugStatusFxEl = document.getElementById('tug-status-fx');
+
   const zapBtnEl = document.getElementById('btn-zap');
-  const zapChargeFillEl = document.getElementById('zap-charge-fill');
+  const zapRingProgressEl = document.getElementById('zap-ring-progress');
   const reelCrankZoneEl = document.getElementById('reel-crank-zone');
   const reelWheelEl = document.getElementById('reel-wheel');
+  const reelSpeedTagEl = document.getElementById('reel-speed-tag');
 
+  // Modals
   const catchModalEl = document.getElementById('catch-modal');
   const catchFishCanvas = document.getElementById('catch-fish-canvas');
   const catchFishCtx = catchFishCanvas.getContext('2d');
@@ -37,17 +62,55 @@
   const btnAlbum = document.getElementById('btn-album');
   const btnAlbumClose = document.getElementById('btn-album-close');
 
-  const btnSound = document.getElementById('btn-sound');
-  const btnMotion = document.getElementById('btn-motion');
+  const parentModalEl = document.getElementById('parent-modal');
+  const btnParentClose = document.getElementById('btn-parent-close');
+  const btnToggleSound = document.getElementById('btn-toggle-sound');
+  const btnToggleVoice = document.getElementById('btn-toggle-voice');
+  const btnToggleMotion = document.getElementById('btn-toggle-motion');
+  const btnResetSave = document.getElementById('btn-reset-save');
+
   const startScreenEl = document.getElementById('start-screen');
   const btnStartGame = document.getElementById('btn-start-game');
+
+  // Fisher Ranks & Auto-Upgrading Fishing Rods!
+  const RANKS = [
+    { minStars: 0,   icon: '🫧', title: '泡泡新手', rodName: '🪵 木頭小釣竿', rodColor: '#ff7043', power: 1.00 },
+    { minStars: 60,  icon: '🐠', title: '小魚達人', rodName: '🍬 彩虹糖果竿', rodColor: '#ff4081', power: 1.08 },
+    { minStars: 160, icon: '🐢', title: '海龜夥伴', rodName: '🌊 海洋藍寶竿', rodColor: '#00b0ff', power: 1.15 },
+    { minStars: 320, icon: '🦈', title: '鯊魚騎士', rodName: '⚡ 閃電黃金竿', rodColor: '#ffc400', power: 1.22 },
+    { minStars: 550, icon: '👑', title: '海洋大王', rodName: '👑 鯨魚王者竿', rodColor: 'rainbow', power: 1.30 }
+  ];
+
+  const FISH_EMOJI = {
+    clownfish: '🐠',
+    blue_tang: '🐟',
+    puffer: '🐡',
+    jellyfish: '🪼',
+    seahorse: '🐴',
+    turtle: '🐢',
+    octopus: '🐙',
+    goldfish: '🥇',
+    baby_shark: '🦈',
+    narwhal: '🦄',
+    treasure: '🎁',
+    rainbow_whale: '🐳'
+  };
 
   // Persistent Progress
   const STORAGE_KEY = 'arcade_fishing_kids_v1';
   let saveState = {
     stars: 0,
-    caught: {} // { fishId: count }
+    caught: {},
+    recentBasket: [] // latest 5 fish IDs
   };
+
+  function getRankIndex(stars) {
+    let idx = 0;
+    for (let i = 0; i < RANKS.length; i++) {
+      if (stars >= RANKS[i].minStars) idx = i;
+    }
+    return idx;
+  }
 
   function loadSave() {
     try {
@@ -56,6 +119,7 @@
         const parsed = JSON.parse(raw);
         saveState.stars = parsed.stars || 0;
         saveState.caught = parsed.caught || {};
+        saveState.recentBasket = Array.isArray(parsed.recentBasket) ? parsed.recentBasket : [];
       }
     } catch (_) {}
     updateHud();
@@ -75,15 +139,13 @@
   let lastTime = performance.now();
   let screenShake = 0;
 
-  // 'idle' | 'casting' | 'waiting' | 'reeling' | 'caught'
-  let phase = 'idle';
+  let phase = 'idle'; // 'idle' | 'casting' | 'waiting' | 'reeling' | 'caught'
   let started = false;
 
   const particles = new window.ParticleSystem();
   let fishes = [];
   let hookedFish = null;
 
-  // Bobber / Line state
   const bobber = {
     x: 0,
     y: 0,
@@ -92,28 +154,30 @@
     startX: 0,
     startY: 0,
     castT: 0,
-    bobPhase: 0,
-    nibbleTimer: 0
+    bobPhase: 0
   };
 
-  // Reeling state
-  let reelProgress = 0; // 0..100 (100 = caught!)
+  // Reeling & Speed Tier state
+  let reelProgress = 0;
   let reelAngle = 0;
+  let spinSpeed = 0; // 0..100 for crank color tier & sparks!
   let rodBend = 0;
-  let zapCharge = 50; // 0..100, starts half full so kids can zap early!
+  let zapCharge = 55;
+  let zapNotified = false;
   let shockTimer = 0;
 
-  // Arcade Events
-  let feverCharge = 0; // 0..100 (every 5 catches triggers Fever!)
+  // Arcade Events & Combo
+  let comboCount = 0;
+  let feverCharge = 0;
   let feverTimer = 0;
-  let bossCooldown = 22; // seconds until next boss visit
+  let bossCooldown = 22;
   let bannerTimer = 0;
 
-  // Motion Sensor (DeviceMotion)
+  // Motion Sensor
   let motionEnabled = false;
   let lastMotionTrigger = 0;
 
-  // Catch Modal preview animation
+  // Catch Modal preview
   let catchPreviewFish = null;
 
   // ---------------- Resize & Setup ----------------
@@ -133,7 +197,6 @@
 
   // ---------------- Fish Spawning ----------------
   function pickRandomFishDef() {
-    // During Fever Time, much higher chance of rare & golden fish!
     const pool = window.FISH_CATALOG.filter((f) => !f.isBoss);
     const totalWeight = pool.reduce((sum, f) => {
       const bonus = feverTimer > 0 && f.rarity >= 2 ? f.weight * 2.5 : f.weight;
@@ -166,7 +229,7 @@
       dir,
       speed: (55 + Math.random() * 45) * def.speed,
       phase: Math.random() * Math.PI * 2,
-      state: 'swim', // 'swim' | 'curious' | 'nibble' | 'hooked' | 'flee'
+      state: 'swim',
       nibbleCount: 0,
       nibbleTimer: 0,
       puffed: 0,
@@ -183,8 +246,7 @@
   }
 
   function triggerBossEvent() {
-    const hasBoss = fishes.some((f) => f.def.isBoss);
-    if (hasBoss) return;
+    if (fishes.some((f) => f.def.isBoss)) return;
     const bossDef = window.FISH_BY_ID['rainbow_whale'];
     spawnFish(bossDef, true);
     showBanner('🐳 彩虹大鯨魚來了！', 'boss', 3.0);
@@ -196,14 +258,16 @@
   function triggerFeverMode() {
     feverTimer = 16;
     feverCharge = 100;
-    showBanner('🌈 彩虹派對時間！', 'fever', 2.8);
+    feverBorderEl.classList.remove('hidden');
+    feverBarWrapEl.classList.add('active');
+    feverX2TagEl.classList.remove('hidden');
+    showBanner('🌈 彩虹派對！星星 x2！', 'fever', 2.8);
     window.arcadeAudio.playFeverStart();
-    window.arcadeAudio.speak('彩虹派對時間！好多閃亮亮的魚喔！');
-    // Spawn extra golden fish!
+    window.arcadeAudio.speak('彩虹派對時間！星星變成兩倍囉！');
     for (let i = 0; i < 3; i++) {
       spawnFish(window.FISH_BY_ID['goldfish'], true);
     }
-    particles.addConfetti(width / 2, height * 0.3, 40);
+    particles.addConfetti(width / 2, height * 0.3, 45);
   }
 
   function showBanner(text, styleClass = '', duration = 2.0) {
@@ -216,7 +280,6 @@
   function castLine(targetX, targetY) {
     if (!started || phase === 'reeling' || phase === 'caught') return;
 
-    // Clamp target inside ocean water
     const clampedX = Math.max(50, Math.min(width - 50, targetX));
     const clampedY = Math.max(waterSurfaceY + 26, Math.min(height - 95, targetY));
 
@@ -228,7 +291,7 @@
     bobber.targetX = clampedX;
     bobber.targetY = clampedY;
     bobber.castT = 0;
-    castHintEl.classList.add('hidden');
+    idleControlsEl.classList.add('hidden');
     window.arcadeAudio.playCast();
   }
 
@@ -236,9 +299,14 @@
     phase = 'reeling';
     hookedFish = fish;
     fish.state = 'hooked';
-    reelProgress = 26; // Start with encouraging progress!
+    reelProgress = 26;
+    spinSpeed = 0;
     shockTimer = 0;
     screenShake = 12;
+
+    tugFishEmojiEl.textContent = FISH_EMOJI[fish.def.id] || '🐟';
+    tugFishSliderEl.classList.add('struggling');
+    tugStatusFxEl.textContent = '💦';
 
     arcadeControlsEl.classList.remove('hidden');
     showBanner('⚡ 咬鉤了！快轉轉轉！', '', 1.8);
@@ -249,19 +317,34 @@
     updateReelUI();
   }
 
-  function addReelPower(amount, showSpark = true) {
+  function addReelPower(amount, showSpark = true, sparkPos = null) {
     if (phase !== 'reeling' || !hookedFish) return;
 
-    // Boss fish needs slightly more cranking, small fish are super breezy!
-    const resistance = hookedFish.def.isBoss ? 0.65 : 1.0;
-    reelProgress = Math.min(100, reelProgress + amount * resistance);
+    const rank = RANKS[getRankIndex(saveState.stars)];
+    const resistance = hookedFish.def.isBoss ? 0.68 : 1.0;
+    reelProgress = Math.min(100, reelProgress + amount * resistance * rank.power);
+
+    const prevZap = zapCharge;
     zapCharge = Math.min(100, zapCharge + amount * 1.15);
+    if (prevZap < 100 && zapCharge >= 100 && !zapNotified) {
+      zapNotified = true;
+      window.arcadeAudio.playZapReady();
+      window.arcadeAudio.speak('閃電集滿了！快按閃電！');
+    }
+
     reelAngle += amount * 16;
+    spinSpeed = Math.min(100, spinSpeed + amount * 3.8);
 
-    window.arcadeAudio.playReelClick(reelProgress / 100);
+    window.arcadeAudio.playReelClick(reelProgress / 100, spinSpeed / 100);
 
-    if (showSpark && Math.random() < 0.45) {
-      particles.addSplash(hookedFish.x, hookedFish.y, 4, '#b3e5fc');
+    if (showSpark) {
+      if (Math.random() < 0.45) {
+        particles.addSplash(hookedFish.x, hookedFish.y, 4, '#b3e5fc');
+      }
+      if (sparkPos) {
+        const sparkColor = spinSpeed > 70 ? '#ffea00' : spinSpeed > 40 ? '#69f0ae' : '#ffffff';
+        particles.addFingerSpark(sparkPos.x, sparkPos.y, sparkColor, 2);
+      }
     }
 
     updateReelUI();
@@ -275,8 +358,10 @@
     if (phase !== 'reeling' || !hookedFish || zapCharge < 100) return;
 
     zapCharge = 0;
+    zapNotified = false;
     shockTimer = 1.6;
     screenShake = 16;
+    tugStatusFxEl.textContent = '💫';
 
     const rodTipX = width / 2 + rodBend * 40;
     const rodTipY = height - 110;
@@ -298,37 +383,56 @@
     hookedFish = null;
     arcadeControlsEl.classList.add('hidden');
 
-    // Remove fish from ocean
     const idx = fishes.indexOf(caught);
     if (idx !== -1) fishes.splice(idx, 1);
 
-    // Celebration particles!
+    // Combo Streak!
+    comboCount++;
+    const comboBonus = comboCount >= 2 ? comboCount * 5 : 0;
+    if (comboCount >= 2) {
+      comboBadgeEl.textContent = `🔥 ${comboCount} 連釣！+${comboBonus}⭐`;
+      comboBadgeEl.classList.remove('hidden');
+      window.arcadeAudio.playCombo(comboCount);
+    }
+
+    // Celebration particles & Flying Stars into HUD!
     particles.addSplash(caught.x, waterSurfaceY + 10, 32, '#ffffff');
     particles.addConfetti(width / 2, height * 0.42, def.isBoss ? 90 : 55);
+    particles.addFlyingStars(width / 2, height * 0.45, 70, 34, def.isBoss ? 12 : 6);
 
-    // Update Save
+    // Update Save & Check Rank Up!
+    const oldRankIdx = getRankIndex(saveState.stars);
     const isNew = !saveState.caught[def.id];
     saveState.caught[def.id] = (saveState.caught[def.id] || 0) + 1;
-    const reward = feverTimer > 0 ? def.stars * 2 : def.stars;
-    saveState.stars += reward;
+    saveState.recentBasket = [def.id, ...saveState.recentBasket].slice(0, 4);
+
+    const baseReward = feverTimer > 0 ? def.stars * 2 : def.stars;
+    const totalReward = baseReward + comboBonus;
+    saveState.stars += totalReward;
+    const newRankIdx = getRankIndex(saveState.stars);
     persistSave();
     updateHud(true);
 
     // Fever meter progress
     if (feverTimer <= 0) {
       feverCharge = Math.min(100, feverCharge + 22);
-      if (feverCharge >= 100) {
-        setTimeout(() => {
-          if (phase !== 'caught') triggerFeverMode();
-        }, 500);
-      }
+      feverFillEl.style.width = `${feverCharge}%`;
     }
 
     // Play fanfare & joyful Mandarin voice!
-    window.arcadeAudio.playCatchFanfare(def.rarity >= 3);
-    setTimeout(() => {
-      window.arcadeAudio.speak(def.voiceLine);
-    }, 350);
+    if (newRankIdx > oldRankIdx) {
+      const nr = RANKS[newRankIdx];
+      window.arcadeAudio.playRankUp();
+      setTimeout(() => {
+        showBanner(`${nr.icon} 升級成 ${nr.title}！`, 'rankup', 3.2);
+        window.arcadeAudio.speak(`哇！太棒了！你升級成${nr.title}，拿到新釣竿囉！`);
+      }, 450);
+    } else {
+      window.arcadeAudio.playCatchFanfare(def.rarity >= 3);
+      setTimeout(() => {
+        window.arcadeAudio.speak(def.voiceLine);
+      }, 350);
+    }
 
     // Populate Catch Modal
     catchPreviewFish = def;
@@ -336,7 +440,7 @@
     catchNewBadgeEl.classList.toggle('hidden', !isNew);
     catchNameEl.textContent = def.name;
     catchFunLineEl.textContent = def.funLine;
-    catchRewardStarsEl.textContent = reward;
+    catchRewardStarsEl.textContent = totalReward;
     catchModalEl.classList.remove('hidden');
   }
 
@@ -344,7 +448,7 @@
     catchModalEl.classList.add('hidden');
     catchPreviewFish = null;
     phase = 'idle';
-    castHintEl.classList.remove('hidden');
+    idleControlsEl.classList.remove('hidden');
     window.arcadeAudio.playBoop(620);
 
     if (feverCharge >= 100 && feverTimer <= 0) {
@@ -353,20 +457,73 @@
   }
 
   function updateReelUI() {
-    reelProgressFillEl.style.width = `${Math.max(4, Math.min(100, reelProgress))}%`;
+    const pct = Math.max(6, Math.min(96, reelProgress));
+    reelProgressFillEl.style.width = `${pct}%`;
+    tugFishSliderEl.style.left = `${pct}%`;
     reelWheelEl.style.transform = `rotate(${reelAngle}deg)`;
-    zapChargeFillEl.style.width = `${Math.min(100, zapCharge)}%`;
+
+    // Circular SVG charge ring on Zap button (circumference = 2 * PI * 58 = 364.4)
+    const zapOffset = 364.4 * (1 - Math.min(100, zapCharge) / 100);
+    zapRingProgressEl.style.strokeDashoffset = `${zapOffset}`;
     zapBtnEl.classList.toggle('ready', zapCharge >= 100);
+
+    // Speed Tier Glow on Reel Crank!
+    let tier = 0;
+    let label = '轉轉轉！';
+    if (spinSpeed > 78) {
+      tier = 3;
+      label = '無敵神速！🌈';
+    } else if (spinSpeed > 48) {
+      tier = 2;
+      label = '超快！🔥';
+    } else if (spinSpeed > 20) {
+      tier = 1;
+      label = '加油！✨';
+    }
+    reelCrankZoneEl.className = `reel-crank-zone speed-${tier}`;
+    reelSpeedTagEl.textContent = label;
   }
 
-  function updateHud(popStar = false) {
+  function updateHud(popRank = false) {
+    const rankIdx = getRankIndex(saveState.stars);
+    const rank = RANKS[rankIdx];
+    const nextRank = RANKS[rankIdx + 1];
+
+    rankIconEl.textContent = rank.icon;
+    rankTitleEl.textContent = rank.title;
+    rodTagEl.textContent = rank.rodName;
     starCountEl.textContent = saveState.stars;
-    if (popStar) {
-      starDisplayEl.classList.remove('pop');
-      void starDisplayEl.offsetWidth;
-      starDisplayEl.classList.add('pop');
-      setTimeout(() => starDisplayEl.classList.remove('pop'), 220);
+
+    // Circular XP ring (circumference = 2 * PI * 19 = 119.4)
+    let xpRatio = 1;
+    if (nextRank) {
+      xpRatio = (saveState.stars - rank.minStars) / Math.max(1, nextRank.minStars - rank.minStars);
     }
+    rankXpRingEl.style.strokeDashoffset = `${119.4 * (1 - Math.max(0.05, Math.min(1, xpRatio)))}`;
+
+    if (popRank) {
+      rankDisplayEl.classList.remove('pop');
+      void rankDisplayEl.offsetWidth;
+      rankDisplayEl.classList.add('pop');
+      setTimeout(() => rankDisplayEl.classList.remove('pop'), 240);
+    }
+
+    // Live Catch Basket mini-icons!
+    basketFishRowEl.innerHTML = '';
+    if (saveState.recentBasket.length === 0) {
+      const dot = document.createElement('span');
+      dot.className = 'basket-empty-dot';
+      dot.textContent = '🐠';
+      basketFishRowEl.appendChild(dot);
+    } else {
+      saveState.recentBasket.forEach((fid) => {
+        const sp = document.createElement('span');
+        sp.className = 'basket-mini-icon';
+        sp.textContent = FISH_EMOJI[fid] || '🐟';
+        basketFishRowEl.appendChild(sp);
+      });
+    }
+
     const caughtCount = Object.keys(saveState.caught).length;
     albumProgressEl.textContent = `${caughtCount}/${window.FISH_CATALOG.length}`;
     feverFillEl.style.width = `${Math.min(100, feverCharge)}%`;
@@ -422,7 +579,93 @@
     albumModalEl.classList.remove('hidden');
   }
 
-  // ---------------- Input Handling (Touch, Mouse, Keyboard, Motion) ----------------
+  // ---------------- Child-Proof Parent Settings (Hold 1.0s) ----------------
+  let holdStart = 0;
+  let holdRaf = null;
+  const HOLD_DURATION = 1000;
+
+  function cancelParentHold() {
+    holdStart = 0;
+    if (holdRaf) cancelAnimationFrame(holdRaf);
+    holdRaf = null;
+    parentHoldRingEl.style.strokeDashoffset = '138.2';
+  }
+
+  function tickParentHold() {
+    if (!holdStart) return;
+    const elapsed = performance.now() - holdStart;
+    const ratio = Math.min(1, elapsed / HOLD_DURATION);
+    parentHoldRingEl.style.strokeDashoffset = `${138.2 * (1 - ratio)}`;
+    if (ratio >= 1) {
+      cancelParentHold();
+      openParentModal();
+    } else {
+      holdRaf = requestAnimationFrame(tickParentHold);
+    }
+  }
+
+  function openParentModal() {
+    window.arcadeAudio.playBoop(620);
+    syncParentButtons();
+    parentModalEl.classList.remove('hidden');
+  }
+
+  function syncParentButtons() {
+    btnToggleSound.classList.toggle('active', window.arcadeAudio.enabled);
+    btnToggleSound.querySelector('.opt-state').textContent = window.arcadeAudio.enabled ? '開啟' : '關閉';
+
+    btnToggleVoice.classList.toggle('active', window.arcadeAudio.voiceEnabled);
+    btnToggleVoice.querySelector('.opt-state').textContent = window.arcadeAudio.voiceEnabled ? '開啟' : '關閉';
+
+    btnToggleMotion.classList.toggle('active', motionEnabled);
+    btnToggleMotion.querySelector('.opt-state').textContent = motionEnabled ? '開啟' : '關閉';
+  }
+
+  btnParentSettings.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    window.arcadeAudio.unlock();
+    if (e.shiftKey) {
+      openParentModal();
+      return;
+    }
+    holdStart = performance.now();
+    holdRaf = requestAnimationFrame(tickParentHold);
+  });
+  btnParentSettings.addEventListener('pointerup', cancelParentHold);
+  btnParentSettings.addEventListener('pointerleave', cancelParentHold);
+  btnParentSettings.addEventListener('pointercancel', cancelParentHold);
+
+  btnParentClose.addEventListener('click', () => {
+    parentModalEl.classList.add('hidden');
+    window.arcadeAudio.playBoop(460);
+  });
+
+  btnToggleSound.addEventListener('click', () => {
+    window.arcadeAudio.toggleSound();
+    syncParentButtons();
+  });
+
+  btnToggleVoice.addEventListener('click', () => {
+    window.arcadeAudio.toggleVoice();
+    syncParentButtons();
+  });
+
+  btnToggleMotion.addEventListener('click', async () => {
+    await toggleMotion();
+    syncParentButtons();
+  });
+
+  btnResetSave.addEventListener('click', () => {
+    saveState = { stars: 0, caught: {}, recentBasket: [] };
+    comboCount = 0;
+    comboBadgeEl.classList.add('hidden');
+    persistSave();
+    updateHud();
+    parentModalEl.classList.add('hidden');
+    showBanner('✨ 已重新開始冒險！', '', 1.8);
+  });
+
+  // ---------------- Input Handling ----------------
   let swipeStart = null;
 
   canvas.addEventListener('pointerdown', (e) => {
@@ -433,27 +676,23 @@
     const px = e.clientX - rect.left;
     const py = e.clientY - rect.top;
 
-    // 1. If reeling, tapping the ocean ALSO reels so 4yo can mash anywhere!
     if (phase === 'reeling') {
-      addReelPower(6.5);
+      addReelPower(6.5, true, { x: px, y: py });
       particles.addRipple(px, py, 48, 'rgba(255,255,255,0.6)');
       return;
     }
 
-    // 2. Interactive ocean fun: pop bubbles!
     if (particles.tryPopBubble(px, py)) {
       window.arcadeAudio.playBubblePop();
       zapCharge = Math.min(100, zapCharge + 8);
       return;
     }
 
-    // 3. Interactive seafloor crab!
     if (particles.tryTapCrab(px, py, height)) {
       window.arcadeAudio.playCreatureGiggle();
       return;
     }
 
-    // 4. Interactive tap on swimming fish (they giggle / puff up!)
     for (const f of fishes) {
       const dx = px - f.x;
       const dy = py - f.y;
@@ -463,15 +702,12 @@
         if (f.def.id === 'puffer') f.puffed = 1;
         window.arcadeAudio.playCreatureGiggle();
         particles.addPopup(f.x, f.y - 30, '哈哈！', '#fff59d', 24);
-        // Also cast right near the fish they tapped so a 4yo gets instant gratification!
         castLine(px, py);
         return;
       }
     }
 
     swipeStart = { x: px, y: py, t: performance.now() };
-
-    // Instant tap-to-cast!
     if (phase === 'idle' || phase === 'waiting') {
       castLine(px, py);
     }
@@ -485,23 +721,26 @@
     const dy = swipeStart.y - py;
     const dt = performance.now() - swipeStart.t;
 
-    // Upward flick cast!
     if (dy > 60 && dt < 400 && (phase === 'idle' || phase === 'waiting')) {
       castLine(px, waterSurfaceY + 80 + Math.random() * (height * 0.45));
     }
     swipeStart = null;
   });
 
-  // Giant Tactile Reel Crank: supports BOTH circular spinning AND tapping!
+  // Giant Pulsing Cast Button
+  btnBigCast.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    window.arcadeAudio.unlock();
+    castLine(width * (0.28 + Math.random() * 0.44), waterSurfaceY + height * (0.24 + Math.random() * 0.34));
+  });
+
+  // Giant Tactile Reel Crank (Spin OR Tap + Finger Spark Trail!)
   let crankPointerId = null;
   let lastCrankAngle = null;
-  let crankMoved = false;
 
   function getCrankAngle(clientX, clientY) {
     const rect = reelWheelEl.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    return Math.atan2(clientY - cy, clientX - cx);
+    return Math.atan2(clientY - (rect.top + rect.height / 2), clientX - (rect.left + rect.width / 2));
   }
 
   reelCrankZoneEl.addEventListener('pointerdown', (e) => {
@@ -510,9 +749,7 @@
     crankPointerId = e.pointerId;
     reelCrankZoneEl.setPointerCapture(e.pointerId);
     lastCrankAngle = getCrankAngle(e.clientX, e.clientY);
-    crankMoved = false;
-    // Instant tap feedback!
-    addReelPower(7.5);
+    addReelPower(7.5, true, { x: e.clientX, y: e.clientY });
   });
 
   reelCrankZoneEl.addEventListener('pointermove', (e) => {
@@ -520,15 +757,12 @@
     const angle = getCrankAngle(e.clientX, e.clientY);
     if (lastCrankAngle !== null) {
       let delta = angle - lastCrankAngle;
-      // Wrap around -PI..PI
       if (delta > Math.PI) delta -= Math.PI * 2;
       if (delta < -Math.PI) delta += Math.PI * 2;
 
-      // Both clockwise & counter-clockwise spinning work for 4yo kids!
       const absDelta = Math.abs(delta);
       if (absDelta > 0.04) {
-        crankMoved = true;
-        addReelPower(absDelta * 9.5);
+        addReelPower(absDelta * 9.5, true, { x: e.clientX, y: e.clientY });
       }
     }
     lastCrankAngle = angle;
@@ -543,14 +777,12 @@
   reelCrankZoneEl.addEventListener('pointerup', endCrank);
   reelCrankZoneEl.addEventListener('pointercancel', endCrank);
 
-  // Zap Button
   zapBtnEl.addEventListener('pointerdown', (e) => {
     e.stopPropagation();
     window.arcadeAudio.unlock();
     triggerElectricZap();
   });
 
-  // Keyboard support (great for desktop / laptop play!)
   window.addEventListener('keydown', (e) => {
     if (!started) return;
     if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'Enter') {
@@ -567,11 +799,16 @@
     }
   });
 
-  // Motion Sensor (Flick to cast, Shake to reel!)
+  // Motion Sensor + Live Tilt Indicator
   function handleDeviceMotion(event) {
     if (!motionEnabled || !started) return;
     const acc = event.accelerationIncludingGravity || event.acceleration;
     if (!acc) return;
+
+    // Live tilt feedback on the top-right rod icon!
+    const tiltDeg = Math.max(-35, Math.min(35, (acc.x || 0) * 4.5));
+    motionRodIconEl.style.transform = `rotate(${tiltDeg}deg)`;
+
     const mag = Math.sqrt((acc.x || 0) ** 2 + (acc.y || 0) ** 2 + (acc.z || 0) ** 2);
     const now = performance.now();
 
@@ -597,35 +834,27 @@
       }
       motionEnabled = true;
       window.addEventListener('devicemotion', handleDeviceMotion);
-      btnMotion.classList.add('active');
+      motionIndicatorEl.classList.remove('hidden');
       showBanner('📱 體感模式開啟！甩一甩！', '', 2.0);
       window.arcadeAudio.playBoop(700);
     } else {
       motionEnabled = false;
       window.removeEventListener('devicemotion', handleDeviceMotion);
-      btnMotion.classList.remove('active');
+      motionIndicatorEl.classList.add('hidden');
       window.arcadeAudio.playBoop(420);
     }
   }
 
-  // UI Buttons
   btnStartGame.addEventListener('click', () => {
     window.arcadeAudio.unlock();
     window.arcadeAudio.playFeverStart();
     startScreenEl.classList.add('hidden');
     started = true;
     setTimeout(() => {
-      window.arcadeAudio.speak('歡迎來到歡樂釣魚大冒險！點水面拋竿吧！');
+      window.arcadeAudio.speak('歡迎來到歡樂釣魚大冒險！點水面或大按鈕拋竿吧！');
     }, 300);
   });
 
-  btnSound.addEventListener('click', () => {
-    const on = window.arcadeAudio.toggle();
-    btnSound.classList.toggle('active', on);
-    btnSound.querySelector('.btn-icon').textContent = on ? '🔊' : '🔇';
-  });
-
-  btnMotion.addEventListener('click', toggleMotion);
   btnCatchOk.addEventListener('click', closeCatchModal);
   btnAlbum.addEventListener('click', openAlbum);
   btnAlbumClose.addEventListener('click', () => {
@@ -639,6 +868,11 @@
 
     if (screenShake > 0) {
       screenShake = Math.max(0, screenShake - dt * 28);
+    }
+
+    if (spinSpeed > 0) {
+      spinSpeed = Math.max(0, spinSpeed - dt * 42);
+      if (phase === 'reeling') updateReelUI();
     }
 
     if (bannerTimer > 0) {
@@ -655,10 +889,12 @@
       if (feverTimer <= 0) {
         feverCharge = 0;
         feverFillEl.style.width = '0%';
+        feverBorderEl.classList.add('hidden');
+        feverBarWrapEl.classList.remove('active');
+        feverX2TagEl.classList.add('hidden');
       }
     }
 
-    // Periodic Boss Event!
     if (started && phase !== 'caught') {
       bossCooldown -= dt;
       if (bossCooldown <= 0) {
@@ -667,13 +903,11 @@
       }
     }
 
-    // Keep ocean lively
     const minFish = feverTimer > 0 ? 13 : 9;
     if (fishes.length < minFish && Math.random() < dt * 2.2) {
       spawnFish(null, true);
     }
 
-    // Update Casting Arc
     if (phase === 'casting') {
       bobber.castT += dt * 2.6;
       if (bobber.castT >= 1) {
@@ -691,7 +925,6 @@
       }
     }
 
-    // Bobber gentle bobbing
     if (phase === 'waiting') {
       bobber.bobPhase += dt * 4.5;
       if (Math.random() < dt * 1.4) {
@@ -699,7 +932,6 @@
       }
     }
 
-    // Update Fishes
     let anyCurious = fishes.some((f) => f.state === 'curious' || f.state === 'nibble');
 
     for (let i = fishes.length - 1; i >= 0; i--) {
@@ -707,7 +939,6 @@
       f.phase += dt * 3.5;
       if (f.tapTimer > 0) f.tapTimer -= dt;
 
-      // Pufferfish puff decay
       if (f.def.id === 'puffer' && f.state !== 'hooked' && f.tapTimer <= 0) {
         f.puffed = Math.max(0, f.puffed - dt * 1.2);
       }
@@ -715,8 +946,8 @@
       if (f.state === 'hooked') {
         if (shockTimer > 0) {
           shockTimer -= dt;
+          if (shockTimer <= 0) tugStatusFxEl.textContent = '💦';
         } else {
-          // Kid-friendly gentle tug! Never drops below 12% so child never loses unfairly.
           const gentlePull = f.def.pullStrength * 14 * dt;
           reelProgress = Math.max(12, reelProgress - gentlePull);
           updateReelUI();
@@ -726,7 +957,6 @@
           f.puffed = Math.min(1, f.puffed + dt * 3);
         }
 
-        // Fish moves closer to bottom-center rod as reelProgress approaches 100!
         const t = reelProgress / 100;
         const struggleX = shockTimer > 0
           ? (Math.random() - 0.5) * 14
@@ -747,7 +977,6 @@
         const dy = bobber.y - f.y;
         const dist = Math.hypot(dx, dy);
 
-        // Attract nearest fish!
         if (f.state === 'swim' && !anyCurious && dist < 260) {
           f.state = 'curious';
           anyCurious = true;
@@ -788,12 +1017,10 @@
         f.state = 'swim';
       }
 
-      // Normal Swimming
       const boost = f.tapTimer > 0 ? 2.2 : 1.0;
       f.x += f.dir * f.speed * boost * dt;
       f.y = f.baseY + Math.sin(f.phase) * 14;
 
-      // Remove off-screen fish
       if ((f.dir === 1 && f.x > width + f.def.size * 2.5) ||
           (f.dir === -1 && f.x < -f.def.size * 2.5)) {
         fishes.splice(i, 1);
@@ -809,7 +1036,6 @@
 
   // ---------------- Render Loop ----------------
   function drawWaterBackground() {
-    // Bright cheerful sky above water
     const skyGrad = ctx.createLinearGradient(0, 0, 0, waterSurfaceY);
     if (feverTimer > 0) {
       skyGrad.addColorStop(0, '#ff80ab');
@@ -821,7 +1047,6 @@
     ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, width, waterSurfaceY + 12);
 
-    // Cute fluffy clouds
     ctx.fillStyle = 'rgba(255, 255, 255, 0.78)';
     for (let i = 0; i < 3; i++) {
       const cx = ((time * 14 + i * (width / 2.6)) % (width + 180)) - 90;
@@ -833,7 +1058,6 @@
       ctx.fill();
     }
 
-    // Ocean gradient
     const seaGrad = ctx.createLinearGradient(0, waterSurfaceY, 0, height);
     if (feverTimer > 0) {
       seaGrad.addColorStop(0, '#26c6da');
@@ -847,7 +1071,6 @@
     ctx.fillStyle = seaGrad;
     ctx.fillRect(0, waterSurfaceY, width, height - waterSurfaceY);
 
-    // Animated wavy waterline
     ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
     ctx.beginPath();
     ctx.moveTo(0, waterSurfaceY);
@@ -866,8 +1089,8 @@
     const rodBaseY = height + 10;
     const rodTipX = width / 2 + rodBend * 75;
     const rodTipY = height - (phase === 'reeling' ? 128 : 92);
+    const rank = RANKS[getRankIndex(saveState.stars)];
 
-    // Draw Fishing Line
     if (phase === 'casting' || phase === 'waiting' || phase === 'reeling') {
       const lineEndX = phase === 'reeling' && hookedFish ? hookedFish.x : bobber.x;
       const lineEndY = phase === 'reeling' && hookedFish ? hookedFish.y : bobber.y;
@@ -878,7 +1101,6 @@
       ctx.beginPath();
       ctx.moveTo(rodTipX, rodTipY);
       if (phase === 'reeling') {
-        // Taut vibrating line!
         const midX = (rodTipX + lineEndX) / 2 + Math.sin(time * 45) * 4;
         const midY = (rodTipY + lineEndY) / 2;
         ctx.quadraticCurveTo(midX, midY, lineEndX, lineEndY);
@@ -893,13 +1115,11 @@
       ctx.stroke();
       ctx.restore();
 
-      // Draw Cute Red & White Arcade Bobber (when casting or waiting)
       if (phase === 'casting' || phase === 'waiting') {
         const by = bobber.y + (phase === 'waiting' ? Math.sin(bobber.bobPhase) * 5 : 0);
         ctx.save();
         ctx.translate(bobber.x, by);
 
-        // Glowing bait aura
         const aura = ctx.createRadialGradient(0, 0, 4, 0, 0, 28);
         aura.addColorStop(0, 'rgba(255, 241, 118, 0.7)');
         aura.addColorStop(1, 'rgba(255, 241, 118, 0)');
@@ -908,23 +1128,19 @@
         ctx.arc(0, 0, 28, 0, Math.PI * 2);
         ctx.fill();
 
-        // Red top half
         ctx.fillStyle = '#ff1744';
         ctx.beginPath();
         ctx.arc(0, 0, 14, Math.PI, 0);
         ctx.fill();
-        // White bottom half
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
         ctx.arc(0, 0, 14, 0, Math.PI);
         ctx.fill();
-        // Outline
         ctx.strokeStyle = '#37474f';
         ctx.lineWidth = 2.5;
         ctx.beginPath();
         ctx.arc(0, 0, 14, 0, Math.PI * 2);
         ctx.stroke();
-        // Shine
         ctx.fillStyle = 'rgba(255,255,255,0.85)';
         ctx.beginPath();
         ctx.arc(-4, -5, 3.5, 0, Math.PI * 2);
@@ -933,26 +1149,32 @@
       }
     }
 
-    // Draw Arcade Fishing Rod at Bottom Center
+    // Auto-Upgraded Fishing Rod Appearance!
     ctx.save();
     ctx.lineCap = 'round';
-    // Outer white border
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 18;
+    ctx.lineWidth = 19;
     ctx.beginPath();
     ctx.moveTo(rodBaseX, rodBaseY);
     ctx.quadraticCurveTo(rodBaseX + rodBend * 25, height - 55, rodTipX, rodTipY);
     ctx.stroke();
 
-    // Inner bright arcade rod color
-    ctx.strokeStyle = '#ff6f00';
-    ctx.lineWidth = 11;
+    if (rank.rodColor === 'rainbow') {
+      const rGrad = ctx.createLinearGradient(rodBaseX, rodBaseY, rodTipX, rodTipY);
+      rGrad.addColorStop(0, '#ff5252');
+      rGrad.addColorStop(0.35, '#ffea00');
+      rGrad.addColorStop(0.7, '#69f0ae');
+      rGrad.addColorStop(1, '#e040fb');
+      ctx.strokeStyle = rGrad;
+    } else {
+      ctx.strokeStyle = rank.rodColor;
+    }
+    ctx.lineWidth = 12;
     ctx.stroke();
 
-    // Glowing rod tip
     ctx.fillStyle = '#ffea00';
     ctx.beginPath();
-    ctx.arc(rodTipX, rodTipY, 8, 0, Math.PI * 2);
+    ctx.arc(rodTipX, rodTipY, 8.5, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
@@ -960,15 +1182,17 @@
   function render() {
     ctx.save();
     if (screenShake > 0) {
-      const sx = (Math.random() - 0.5) * screenShake;
-      const sy = (Math.random() - 0.5) * screenShake;
-      ctx.translate(sx, sy);
+      ctx.translate((Math.random() - 0.5) * screenShake, (Math.random() - 0.5) * screenShake);
     }
 
     drawWaterBackground();
     particles.drawBackgroundDetails(ctx, width, height, waterSurfaceY, time, feverTimer > 0);
 
-    // Draw all swimming & hooked fish
+    // Zero-reading water cast target cue when idle!
+    if (started && phase === 'idle') {
+      particles.drawCastTarget(ctx, width * 0.5, waterSurfaceY + height * 0.34, time);
+    }
+
     fishes.forEach((f) => {
       ctx.save();
       ctx.translate(f.x, f.y);
@@ -990,7 +1214,6 @@
     particles.drawForegroundEffects(ctx);
     ctx.restore();
 
-    // Animate caught fish inside celebration modal!
     if (catchPreviewFish) {
       catchFishCtx.clearRect(0, 0, catchFishCanvas.width, catchFishCanvas.height);
       catchFishCtx.save();
@@ -1014,7 +1237,6 @@
     requestAnimationFrame(loop);
   }
 
-  // Init!
   loadSave();
   populateOcean();
   requestAnimationFrame(loop);

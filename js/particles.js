@@ -1,6 +1,7 @@
 /* =========================================================
-   Juicy Arcade Particle & Underwater Scenery System
-   Poppable bubbles, splashes, ripples, confetti, lightning!
+   Juicy Arcade Particle & Underwater Scenery System (v2)
+   Poppable bubbles, splashes, ripples, confetti, lightning,
+   finger sparks, flying reward stars, and idle cast target!
    ========================================================= */
 
 class ParticleSystem {
@@ -11,6 +12,8 @@ class ParticleSystem {
     this.popups = [];
     this.confetti = [];
     this.lightningBolts = [];
+    this.fingerSparks = [];
+    this.flyingStars = [];
     this.seaweeds = [];
     this.crab = {
       x: 160,
@@ -34,7 +37,6 @@ class ParticleSystem {
     }
     this.crab.x = width * 0.25;
 
-    // Seed initial poppable bubbles
     this.bubbles = [];
     for (let i = 0; i < 16; i++) {
       this.spawnBubble(width, height, Math.random() * height);
@@ -66,6 +68,36 @@ class ParticleSystem {
         color,
         life: 0.7 + Math.random() * 0.4,
         maxLife: 1.1
+      });
+    }
+  }
+
+  addFingerSpark(x, y, color = '#ffeb3b', count = 3) {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 40 + Math.random() * 110;
+      this.fingerSparks.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 20,
+        r: 4 + Math.random() * 5,
+        color,
+        life: 0.45 + Math.random() * 0.25,
+        maxLife: 0.7
+      });
+    }
+  }
+
+  addFlyingStars(fromX, fromY, toX, toY, count = 6) {
+    for (let i = 0; i < count; i++) {
+      this.flyingStars.push({
+        startX: fromX + (Math.random() - 0.5) * 60,
+        startY: fromY + (Math.random() - 0.5) * 40,
+        toX,
+        toY,
+        t: -i * 0.08, // staggered launch!
+        duration: 0.65 + Math.random() * 0.2
       });
     }
   }
@@ -138,7 +170,6 @@ class ParticleSystem {
       const b = this.bubbles[i];
       const dx = px - b.x;
       const dy = py - b.y;
-      // Generous hit radius for 4yo fingers!
       if (dx * dx + dy * dy <= (b.r + 22) * (b.r + 22)) {
         this.bubbles.splice(i, 1);
         this.addSplash(b.x, b.y, 10, '#ffffff');
@@ -164,7 +195,6 @@ class ParticleSystem {
   }
 
   update(dt, width, height, waterSurfaceY) {
-    // Keep poppable bubbles plentiful
     if (this.bubbles.length < 16 && Math.random() < dt * 2.5) {
       this.spawnBubble(width, height);
     }
@@ -179,7 +209,6 @@ class ParticleSystem {
       }
     }
 
-    // Splashes
     for (let i = this.splashes.length - 1; i >= 0; i--) {
       const p = this.splashes[i];
       p.x += p.vx * dt;
@@ -189,7 +218,20 @@ class ParticleSystem {
       if (p.life <= 0) this.splashes.splice(i, 1);
     }
 
-    // Ripples
+    for (let i = this.fingerSparks.length - 1; i >= 0; i--) {
+      const s = this.fingerSparks[i];
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      s.life -= dt;
+      if (s.life <= 0) this.fingerSparks.splice(i, 1);
+    }
+
+    for (let i = this.flyingStars.length - 1; i >= 0; i--) {
+      const fs = this.flyingStars[i];
+      fs.t += dt / fs.duration;
+      if (fs.t >= 1) this.flyingStars.splice(i, 1);
+    }
+
     for (let i = this.ripples.length - 1; i >= 0; i--) {
       const r = this.ripples[i];
       r.r += 110 * dt;
@@ -197,7 +239,6 @@ class ParticleSystem {
       if (r.r >= r.maxR) this.ripples.splice(i, 1);
     }
 
-    // Floating text popups
     for (let i = this.popups.length - 1; i >= 0; i--) {
       const pop = this.popups[i];
       pop.y += pop.vy * dt;
@@ -205,7 +246,6 @@ class ParticleSystem {
       if (pop.life <= 0) this.popups.splice(i, 1);
     }
 
-    // Confetti
     for (let i = this.confetti.length - 1; i >= 0; i--) {
       const c = this.confetti[i];
       c.x += c.vx * dt;
@@ -216,13 +256,11 @@ class ParticleSystem {
       if (c.life <= 0) this.confetti.splice(i, 1);
     }
 
-    // Lightning
     for (let i = this.lightningBolts.length - 1; i >= 0; i--) {
       this.lightningBolts[i].life -= dt;
       if (this.lightningBolts[i].life <= 0) this.lightningBolts.splice(i, 1);
     }
 
-    // Seafloor Crab
     this.crab.phase += dt * (this.crab.danceTimer > 0 ? 16 : 4);
     if (this.crab.danceTimer > 0) {
       this.crab.danceTimer -= dt;
@@ -233,8 +271,33 @@ class ParticleSystem {
     }
   }
 
+  drawCastTarget(ctx, x, y, time) {
+    const pulse = (time * 1.1) % 1;
+    ctx.save();
+    ctx.translate(x, y);
+
+    // Expanding glowing water ring
+    ctx.strokeStyle = `rgba(255, 241, 118, ${0.85 * (1 - pulse)})`;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 18 + pulse * 46, (18 + pulse * 46) * 0.48, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Soft center target dot
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 12, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bouncing pointing finger emoji above target
+    const bounce = Math.sin(time * 5.5) * 8;
+    ctx.font = '34px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('👇', 0, -24 + bounce);
+    ctx.restore();
+  }
+
   drawBackgroundDetails(ctx, width, height, waterSurfaceY, time, feverMode) {
-    // Sunbeams
     ctx.save();
     for (let i = 0; i < 5; i++) {
       const bx = width * (0.12 + i * 0.2) + Math.sin(time * 0.6 + i) * 30;
@@ -258,7 +321,6 @@ class ParticleSystem {
     }
     ctx.restore();
 
-    // Sandy ocean floor
     ctx.save();
     const sandGrad = ctx.createLinearGradient(0, height - 68, 0, height);
     sandGrad.addColorStop(0, '#ffe082');
@@ -276,7 +338,6 @@ class ParticleSystem {
     ctx.fill();
     ctx.restore();
 
-    // Swaying Seaweed
     this.seaweeds.forEach((sw) => {
       ctx.save();
       ctx.strokeStyle = sw.color;
@@ -295,7 +356,6 @@ class ParticleSystem {
       ctx.restore();
     });
 
-    // Cute interactive Seafloor Crab
     this.drawCrab(ctx, height);
   }
 
@@ -310,7 +370,6 @@ class ParticleSystem {
       ctx.rotate(Math.sin(this.crab.phase) * 0.25);
     }
 
-    // Claws
     ctx.fillStyle = '#ff5252';
     const clawWave = Math.sin(this.crab.phase) * 5;
     ctx.beginPath();
@@ -318,13 +377,11 @@ class ParticleSystem {
     ctx.arc(22, -12 - clawWave, 8, 0, Math.PI * 2);
     ctx.fill();
 
-    // Body
     ctx.fillStyle = '#ff1744';
     ctx.beginPath();
     ctx.ellipse(0, 0, 20, 13, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Eyes
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
     ctx.arc(-7, -12, 5, 0, Math.PI * 2);
@@ -336,7 +393,6 @@ class ParticleSystem {
     ctx.arc(7, -12, 2.5, 0, Math.PI * 2);
     ctx.fill();
 
-    // Happy smile
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -347,7 +403,6 @@ class ParticleSystem {
   }
 
   drawForegroundEffects(ctx) {
-    // Poppable Bubbles
     this.bubbles.forEach((b) => {
       ctx.save();
       ctx.beginPath();
@@ -358,7 +413,6 @@ class ParticleSystem {
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Specular shine
       ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
       ctx.beginPath();
       ctx.arc(b.x - b.r * 0.32, b.y - b.r * 0.32, b.r * 0.24, 0, Math.PI * 2);
@@ -366,7 +420,6 @@ class ParticleSystem {
       ctx.restore();
     });
 
-    // Ripples
     this.ripples.forEach((r) => {
       ctx.save();
       ctx.globalAlpha = r.alpha;
@@ -378,7 +431,6 @@ class ParticleSystem {
       ctx.restore();
     });
 
-    // Splashes
     this.splashes.forEach((p) => {
       ctx.save();
       ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
@@ -389,7 +441,30 @@ class ParticleSystem {
       ctx.restore();
     });
 
-    // Electric Rainbow Lightning Bolts
+    // Finger & Reel Speed Sparks
+    this.fingerSparks.forEach((s) => {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, s.life / s.maxLife);
+      ctx.fillStyle = s.color;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+
+    // Flying Reward Stars arcing to top-left HUD!
+    this.flyingStars.forEach((fs) => {
+      if (fs.t < 0) return;
+      const ease = 1 - Math.pow(1 - fs.t, 3);
+      const x = fs.startX + (fs.toX - fs.startX) * ease;
+      const y = fs.startY + (fs.toY - fs.startY) * ease - Math.sin(fs.t * Math.PI) * 90;
+      ctx.save();
+      ctx.font = '28px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('⭐', x, y);
+      ctx.restore();
+    });
+
     this.lightningBolts.forEach((bolt) => {
       ctx.save();
       const alpha = bolt.life / bolt.maxLife;
@@ -397,7 +472,6 @@ class ParticleSystem {
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
 
-      // Outer golden glow
       ctx.strokeStyle = '#ffea00';
       ctx.lineWidth = 14;
       ctx.beginPath();
@@ -407,14 +481,12 @@ class ParticleSystem {
       });
       ctx.stroke();
 
-      // Inner bright white core
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 5;
       ctx.stroke();
       ctx.restore();
     });
 
-    // Confetti
     this.confetti.forEach((c) => {
       ctx.save();
       ctx.translate(c.x, c.y);
@@ -424,7 +496,6 @@ class ParticleSystem {
       ctx.restore();
     });
 
-    // Floating Popups
     this.popups.forEach((pop) => {
       ctx.save();
       ctx.globalAlpha = Math.min(1, pop.life * 1.4);

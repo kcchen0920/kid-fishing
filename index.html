@@ -3,24 +3,48 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#29b6f6">
+  <link rel="manifest" href="manifest.json">
   <title>歡樂釣魚大冒險 🎣</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <div id="game-container">
+    <!-- Rainbow Fever Screen Neon Frame -->
+    <div id="fever-border" class="fever-border hidden"></div>
+
     <!-- Main Ocean Canvas -->
     <canvas id="ocean-canvas"></canvas>
 
     <!-- Top Arcade HUD -->
     <header id="hud-top">
       <div class="hud-left">
-        <div class="pill-badge star-badge" id="star-display" aria-label="星星數量">
-          <span class="badge-icon">⭐</span>
-          <span id="star-count">0</span>
+        <!-- Player Rank Badge + Circular XP Ring + Stars -->
+        <div class="rank-pill" id="rank-display" title="小小釣魚王等級">
+          <div class="rank-avatar-wrap">
+            <svg class="rank-xp-svg" viewBox="0 0 44 44">
+              <circle class="xp-track" cx="22" cy="22" r="19"></circle>
+              <circle class="xp-fill" id="rank-xp-ring" cx="22" cy="22" r="19"></circle>
+            </svg>
+            <span class="rank-icon" id="rank-icon">🫧</span>
+          </div>
+          <div class="rank-info">
+            <div class="rank-title" id="rank-title">泡泡新手</div>
+            <div class="rank-stars" id="star-display">
+              <span>⭐</span><span id="star-count">0</span>
+            </div>
+          </div>
         </div>
-        <button class="arcade-btn album-btn" id="btn-album" aria-label="我的魚缸圖鑑">
-          <span class="btn-icon">🐠</span>
-          <span class="btn-label" id="album-progress">0/12</span>
+
+        <!-- Live Catch Basket & Album Trigger -->
+        <button class="arcade-btn basket-btn" id="btn-album" aria-label="今日魚籃與圖鑑">
+          <span class="basket-icon">🪣</span>
+          <div class="basket-fish-row" id="basket-fish-row">
+            <span class="basket-empty-dot">🐠</span>
+          </div>
+          <span class="basket-count" id="album-progress">0/12</span>
         </button>
       </div>
 
@@ -30,56 +54,69 @@
           <div class="fever-track">
             <div id="fever-fill" class="fever-fill"></div>
           </div>
+          <span id="fever-x2-tag" class="fever-x2-tag hidden">x2!</span>
         </div>
+        <div id="combo-badge" class="combo-badge hidden">🔥 2 連釣！</div>
       </div>
 
       <div class="hud-right">
-        <button class="arcade-btn icon-btn" id="btn-motion" title="體感甩竿開關" aria-label="體感開關">
-          <span class="btn-icon">📱</span>
-        </button>
-        <button class="arcade-btn icon-btn active" id="btn-sound" title="音效開關" aria-label="音效開關">
-          <span class="btn-icon">🔊</span>
+        <!-- Live Motion Tilt Indicator (Visible when Motion Mode ON) -->
+        <div id="motion-indicator" class="motion-indicator hidden" title="體感甩竿已開啟">
+          <span id="motion-rod-icon" class="motion-rod-icon">🎣</span>
+        </div>
+
+        <!-- Parent Settings Button (Hold 1.2s to open - child proof!) -->
+        <button class="arcade-btn parent-gear-btn" id="btn-parent-settings" title="長按開啟家長設定" aria-label="長按開啟家長設定">
+          <svg class="hold-ring-svg" viewBox="0 0 52 52">
+            <circle class="hold-ring-bg" cx="26" cy="26" r="22"></circle>
+            <circle class="hold-ring-fill" id="parent-hold-ring" cx="26" cy="26" r="22"></circle>
+          </svg>
+          <span class="btn-icon">⚙️</span>
         </button>
       </div>
     </header>
 
-    <!-- Dynamic Floating Event Banner (BITE! / BOSS! / FEVER!) -->
+    <!-- Dynamic Floating Event Banner (BITE! / BOSS! / FEVER! / RANK UP!) -->
     <div id="event-banner" class="event-banner hidden">
       <div class="banner-text" id="event-banner-text">咬鉤了！</div>
     </div>
 
-    <!-- Contextual Visual Hint for 4yo (No reading required!) -->
-    <div id="cast-hint" class="cast-hint">
-      <div class="hint-bubble">
-        <span class="hint-finger">👆</span>
-        <span class="hint-text">點水面拋竿！</span>
-      </div>
+    <!-- Idle Cast Controls: Visual Hint + Giant Pulsing Cast Button -->
+    <div id="idle-controls" class="idle-controls">
+      <div class="rod-tag" id="rod-tag">🪵 木頭小釣竿</div>
+      <button id="btn-big-cast" class="big-cast-btn" aria-label="拋竿釣魚">
+        <span class="cast-btn-icon">🎣</span>
+        <span class="cast-btn-label">拋竿！</span>
+      </button>
     </div>
 
     <!-- Bottom Arcade Controls (Reeling & Zap!) -->
     <div id="arcade-controls" class="arcade-controls hidden">
-      <!-- Progress Bar showing how close the fish is -->
-      <div class="reel-progress-wrap">
-        <span class="reel-fish-icon">🐟</span>
-        <div class="reel-progress-track">
+      <!-- Upgraded Arcade Tug-of-War Progress Bar -->
+      <div class="tug-bar-wrap">
+        <div class="tug-track">
           <div id="reel-progress-fill" class="reel-progress-fill"></div>
+          <div id="tug-fish-slider" class="tug-fish-slider">
+            <span id="tug-fish-emoji">🐟</span>
+            <span id="tug-status-fx" class="tug-status-fx">💦</span>
+          </div>
         </div>
         <span class="reel-bucket-icon">🪣</span>
       </div>
 
       <div class="controls-row">
-        <!-- Giant Electric Shock / Super Power Button (Ace Angler style!) -->
+        <!-- Giant Electric Shock Button with Circular SVG Charge Ring -->
         <button id="btn-zap" class="zap-btn" aria-label="閃電必殺技">
-          <div class="zap-ring"></div>
+          <svg class="zap-ring-svg" viewBox="0 0 132 132">
+            <circle class="zap-ring-track" cx="66" cy="66" r="58"></circle>
+            <circle class="zap-ring-progress" id="zap-ring-progress" cx="66" cy="66" r="58"></circle>
+          </svg>
           <span class="zap-icon">⚡</span>
           <span class="zap-label">閃電！</span>
-          <div class="zap-charge-bar">
-            <div id="zap-charge-fill" class="zap-charge-fill"></div>
-          </div>
         </button>
 
-        <!-- Giant Tactile Fishing Reel Crank (Spin OR Tap!) -->
-        <div id="reel-crank-zone" class="reel-crank-zone" aria-label="轉動捲線器">
+        <!-- Giant Tactile Fishing Reel Crank with Dynamic Speed Tier Glow -->
+        <div id="reel-crank-zone" class="reel-crank-zone speed-0" aria-label="轉動捲線器">
           <div class="reel-outer-ring">
             <div class="reel-arrows">↻</div>
             <div id="reel-wheel" class="reel-wheel">
@@ -89,7 +126,7 @@
               <div id="reel-knob" class="reel-knob"></div>
             </div>
           </div>
-          <div class="reel-hint-tag">轉轉轉！</div>
+          <div class="reel-hint-tag" id="reel-speed-tag">轉轉轉！</div>
         </div>
       </div>
     </div>
@@ -97,7 +134,6 @@
     <!-- Big Catch Celebration Overlay -->
     <div id="catch-modal" class="modal-overlay hidden">
       <div class="catch-card">
-        <div class="catch-rays"></div>
         <div class="catch-stars" id="catch-stars">⭐⭐⭐</div>
         <div class="catch-badge hidden" id="catch-new-badge">✨ 新發現！</div>
         <canvas id="catch-fish-canvas" width="260" height="200"></canvas>
@@ -121,7 +157,36 @@
       </div>
     </div>
 
-    <!-- Welcome / Start Screen (Unlocks Web Audio & sets playful arcade mood) -->
+    <!-- Parent Settings Modal (Child-Proof) -->
+    <div id="parent-modal" class="modal-overlay hidden">
+      <div class="parent-card">
+        <div class="album-header">
+          <h2>⚙️ 家長設定</h2>
+          <button id="btn-parent-close" class="arcade-btn close-btn" aria-label="關閉">✖</button>
+        </div>
+        <p class="parent-tip">提示：長按右上角 ⚙️ 1 秒即可開啟此選單，避免小朋友誤觸。</p>
+        <div class="parent-options">
+          <button id="btn-toggle-sound" class="parent-opt-btn active">
+            <span>🔊 電玩音效</span>
+            <span class="opt-state">開啟</span>
+          </button>
+          <button id="btn-toggle-voice" class="parent-opt-btn active">
+            <span>🗣️ 中文語音鼓勵</span>
+            <span class="opt-state">開啟</span>
+          </button>
+          <button id="btn-toggle-motion" class="parent-opt-btn">
+            <span>📱 手機體感甩竿</span>
+            <span class="opt-state">關閉</span>
+          </button>
+          <button id="btn-reset-save" class="parent-opt-btn danger">
+            <span>🗑️ 重置星星與圖鑑</span>
+            <span class="opt-state">重置</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Welcome / Start Screen -->
     <div id="start-screen" class="start-screen">
       <div class="start-card">
         <div class="start-logo-wrap">
@@ -129,7 +194,7 @@
           <div class="start-rod-wave">🎣</div>
         </div>
         <h1 class="start-title">歡樂釣魚大冒險</h1>
-        <p class="start-desc">點水面拋竿・轉轉捲線器・放閃電釣大魚！</p>
+        <p class="start-desc">點水面或按大按鈕拋竿・轉轉捲線器・放閃電釣大魚！</p>
         <button id="btn-start-game" class="big-play-btn pulse-btn">
           <span>▶ 開始釣魚！</span>
         </button>

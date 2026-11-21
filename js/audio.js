@@ -1,13 +1,13 @@
 /* =========================================================
    Synthesized Arcade Sound Engine (Web Audio API)
-   + Cheerful Mandarin Voice Encouragement + Haptic Feedback
-   Zero external audio files needed!
+   + Independent Mandarin Voice Encouragement + Haptics
    ========================================================= */
 
 class ArcadeAudio {
   constructor() {
     this.ctx = null;
     this.enabled = true;
+    this.voiceEnabled = true;
     this.lastReelSoundTime = 0;
   }
 
@@ -23,13 +23,23 @@ class ArcadeAudio {
     }
   }
 
-  toggle() {
+  toggleSound() {
     this.enabled = !this.enabled;
     if (this.enabled) {
       this.unlock();
       this.playBoop(520);
     }
     return this.enabled;
+  }
+
+  toggleVoice() {
+    this.voiceEnabled = !this.voiceEnabled;
+    if (this.voiceEnabled) {
+      this.speak('語音打開囉！');
+    } else if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    return this.voiceEnabled;
   }
 
   vibrate(pattern) {
@@ -42,14 +52,14 @@ class ArcadeAudio {
   }
 
   speak(text) {
-    if (!this.enabled || !('speechSynthesis' in window)) return;
+    if (!this.voiceEnabled || !('speechSynthesis' in window)) return;
     try {
       window.speechSynthesis.cancel();
       const utter = new SpeechSynthesisUtterance(text);
       utter.lang = 'zh-TW';
       utter.rate = 1.08;
-      utter.pitch = 1.25; // Cheerful, friendly kid-oriented tone
-      utter.volume = 0.9;
+      utter.pitch = 1.25;
+      utter.volume = 0.92;
       window.speechSynthesis.speak(utter);
     } catch (_) {}
   }
@@ -110,7 +120,6 @@ class ArcadeAudio {
   }
 
   playCast() {
-    // Whoosh upward then splash!
     this.playTone(260, 0.22, 'sine', 0.15, 720);
     this.playNoise(0.18, 1200, 0.08);
     this.playSplash(0.2);
@@ -129,7 +138,6 @@ class ArcadeAudio {
   }
 
   playBiteAlarm() {
-    // Exciting arcade "HIT!" double chime
     const notes = [587.33, 880, 1174.66];
     notes.forEach((n, idx) => {
       this.playTone(n, 0.14, 'square', 0.12, n * 1.04, idx * 0.07);
@@ -138,20 +146,23 @@ class ArcadeAudio {
     this.vibrate([50, 35, 80]);
   }
 
-  playReelClick(progress = 0.5) {
+  playReelClick(progress = 0.5, speedBoost = 0) {
     if (!this.enabled || !this.ctx) return;
     const now = performance.now();
-    if (now - this.lastReelSoundTime < 48) return;
+    if (now - this.lastReelSoundTime < 46) return;
     this.lastReelSoundTime = now;
 
-    // Ratchet click whose pitch rises as the fish gets closer!
-    const pitch = 340 + progress * 540 + (Math.random() * 35);
+    const pitch = 340 + progress * 500 + speedBoost * 160 + Math.random() * 30;
     this.playTone(pitch, 0.045, 'triangle', 0.16, pitch * 1.25);
     this.vibrate(12);
   }
 
+  playZapReady() {
+    this.playTone(660, 0.1, 'triangle', 0.18, 990, 0);
+    this.playTone(990, 0.16, 'triangle', 0.2, 1320, 0.09);
+  }
+
   playZap() {
-    // Arcade electric shock!
     this.playTone(1200, 0.28, 'sawtooth', 0.14, 180);
     this.playTone(880, 0.25, 'square', 0.1, 1400, 0.05);
     this.playNoise(0.22, 2400, 0.16, 0.02);
@@ -170,8 +181,20 @@ class ArcadeAudio {
     this.vibrate([60, 40, 120]);
   }
 
+  playRankUp() {
+    const notes = [523.25, 659.25, 783.99, 1046.5, 1318.5, 1567.98];
+    notes.forEach((n, i) => {
+      this.playTone(n, 0.18, 'triangle', 0.22, null, i * 0.08);
+    });
+    this.vibrate([50, 30, 50, 30, 120]);
+  }
+
+  playCombo(count) {
+    const base = 520 + Math.min(count, 8) * 60;
+    this.playTone(base, 0.12, 'triangle', 0.18, base * 1.25);
+  }
+
   playBossAlert() {
-    // Dramatic yet friendly arcade alert
     [330, 440, 330, 440, 587.33].forEach((freq, i) => {
       this.playTone(freq, 0.16, 'sawtooth', 0.1, null, i * 0.14);
     });
