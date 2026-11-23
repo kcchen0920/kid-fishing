@@ -83,6 +83,26 @@ class ArcadeAudio {
     }
   }
 
+  pauseForBackground() {
+    this._wasBgmRunning = Boolean(this.bgmTimer);
+    this.stopBgm();
+    if (this.ctx && this.ctx.state === 'running') {
+      this.ctx.suspend().catch(() => {});
+    }
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+  }
+
+  resumeFromBackground() {
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {});
+    }
+    if (this._wasBgmRunning && this.bgmEnabled) {
+      this.startBgm();
+    }
+  }
+
   setBgmFever(active) {
     this.bgmFever = active;
   }
@@ -264,6 +284,31 @@ class ArcadeAudio {
   playCreatureGiggle() {
     this.playTone(540, 0.07, 'sine', 0.16, 760, 0);
     this.playTone(620, 0.08, 'sine', 0.16, 880, 0.08);
+  }
+
+  playPearlChime() {
+    const notes = [880, 1174.66, 1396.91, 1760];
+    notes.forEach((n, i) => {
+      this.playTone(n, 0.18, 'sine', 0.16, null, i * 0.055);
+    });
+    this.vibrate([20, 20, 40]);
+  }
+
+  playSeagull() {
+    this.playTone(1350, 0.12, 'triangle', 0.12, 920, 0);
+    this.playTone(1200, 0.14, 'triangle', 0.11, 860, 0.13);
+  }
+
+  playFeedPlop() {
+    this.playTone(360, 0.09, 'sine', 0.16, 620, 0);
+  }
+
+  playStickerReward() {
+    const notes = [659.25, 783.99, 1046.5, 1318.5, 1567.98];
+    notes.forEach((n, i) => {
+      this.playTone(n, 0.16, 'triangle', 0.2, null, i * 0.07);
+    });
+    this.vibrate([40, 25, 80]);
   }
 }
 

@@ -20,6 +20,7 @@
   const feverBarWrapEl = document.getElementById('fever-bar-wrap');
   const feverFillEl = document.getElementById('fever-fill');
   const feverX2TagEl = document.getElementById('fever-x2-tag');
+  const questDotsEl = document.getElementById('quest-dots');
   const comboBadgeEl = document.getElementById('combo-badge');
 
   const motionIndicatorEl = document.getElementById('motion-indicator');
@@ -34,6 +35,9 @@
   const btnStageSwitch = document.getElementById('btn-stage-switch');
   const stageIconEl = document.getElementById('stage-icon');
   const stageNameEl = document.getElementById('stage-name');
+  const btnBaitSwitch = document.getElementById('btn-bait-switch');
+  const baitIconEl = document.getElementById('bait-icon');
+  const baitNameEl = document.getElementById('bait-name');
   const rodTagEl = document.getElementById('rod-tag');
   const btnBigCast = document.getElementById('btn-big-cast');
 
@@ -62,6 +66,12 @@
 
   const albumModalEl = document.getElementById('album-modal');
   const albumGridEl = document.getElementById('album-grid');
+  const tabAlbumGridEl = document.getElementById('tab-album-grid');
+  const tabAquariumEl = document.getElementById('tab-aquarium');
+  const stickerListEl = document.getElementById('sticker-list');
+  const aquariumViewEl = document.getElementById('aquarium-view');
+  const aquariumCanvas = document.getElementById('aquarium-canvas');
+  const aquariumCtx = aquariumCanvas.getContext('2d');
   const btnAlbum = document.getElementById('btn-album');
   const btnAlbumClose = document.getElementById('btn-album-close');
 
@@ -71,7 +81,12 @@
   const btnToggleBgm = document.getElementById('btn-toggle-bgm');
   const btnToggleVoice = document.getElementById('btn-toggle-voice');
   const btnToggleMotion = document.getElementById('btn-toggle-motion');
+  const btnToggleEyecare = document.getElementById('btn-toggle-eyecare');
   const btnResetSave = document.getElementById('btn-reset-save');
+
+  const goodnightModalEl = document.getElementById('goodnight-modal');
+  const btnGoodnightMore = document.getElementById('btn-goodnight-more');
+  const btnGoodnightClose = document.getElementById('btn-goodnight-close');
 
   const startScreenEl = document.getElementById('start-screen');
   const btnStartGame = document.getElementById('btn-start-game');
@@ -130,12 +145,37 @@
     rainbow_whale: '🐳'
   };
 
-  // Persistent Progress
+  // 3 Free Fun Baits!
+  const BAITS = [
+    { id: 'shrimp', icon: '🦐', name: '小蝦米', desc: '小魚最愛！', boost: 'normal' },
+    { id: 'candy',  icon: '🍬', name: '彩虹糖', desc: '稀有魚更愛來！', boost: 'rare' },
+    { id: 'star',   icon: '✨', name: '發光星', desc: '深海與寶箱最愛！', boost: 'deep' }
+  ];
+  let currentBaitIdx = 0;
+
+  // Collectible Ocean Stickers (earned every 3 catches!)
+  const STICKER_POOL = ['👑', '🌟', '🐚', '🧜‍♀️', '⚓', '🌈', '💎', '🏖️'];
+  const EYECARE_PRESETS = [0, 10, 15, 20]; // minutes (0 = off)
+  let eyeCareRemainingSec = 0;
+  let eyeCareTriggered = false;
+  let resetConfirmTimer = null;
+
+  // Persistent Progress & Preferences
   const STORAGE_KEY = 'arcade_fishing_kids_v1';
   let saveState = {
     stars: 0,
     caught: {},
-    recentBasket: [] // latest 5 fish IDs
+    recentBasket: [], // latest 4 fish IDs
+    stageIdx: 0,
+    baitIdx: 0,
+    questProgress: 0,
+    stickers: [],
+    eyeCareMinutes: 0,
+    prefs: {
+      sound: true,
+      bgm: true,
+      voice: true
+    }
   };
 
   function getRankIndex(stars) {
@@ -146,6 +186,18 @@
     return idx;
   }
 
+  function applyStageUI() {
+    const st = STAGES[currentStageIdx] || STAGES[0];
+    stageIconEl.textContent = st.icon;
+    stageNameEl.textContent = st.name;
+  }
+
+  function applyBaitUI() {
+    const b = BAITS[currentBaitIdx] || BAITS[0];
+    baitIconEl.textContent = b.icon;
+    baitNameEl.textContent = b.name;
+  }
+
   function loadSave() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -154,12 +206,40 @@
         saveState.stars = parsed.stars || 0;
         saveState.caught = parsed.caught || {};
         saveState.recentBasket = Array.isArray(parsed.recentBasket) ? parsed.recentBasket : [];
+        saveState.stageIdx = Number.isInteger(parsed.stageIdx) ? parsed.stageIdx % STAGES.length : 0;
+        saveState.baitIdx = Number.isInteger(parsed.baitIdx) ? parsed.baitIdx % BAITS.length : 0;
+        saveState.questProgress = parsed.questProgress || 0;
+        saveState.stickers = Array.isArray(parsed.stickers) ? parsed.stickers : [];
+        saveState.eyeCareMinutes = EYECARE_PRESETS.includes(parsed.eyeCareMinutes) ? parsed.eyeCareMinutes : 0;
+        if (parsed.prefs && typeof parsed.prefs === 'object') {
+          saveState.prefs.sound = parsed.prefs.sound !== false;
+          saveState.prefs.bgm = parsed.prefs.bgm !== false;
+          saveState.prefs.voice = parsed.prefs.voice !== false;
+        }
       }
     } catch (_) {}
+
+    currentStageIdx = saveState.stageIdx;
+    currentBaitIdx = saveState.baitIdx;
+    window.arcadeAudio.enabled = saveState.prefs.sound;
+    window.arcadeAudio.bgmEnabled = saveState.prefs.bgm;
+    window.arcadeAudio.voiceEnabled = saveState.prefs.voice;
+    eyeCareRemainingSec = saveState.eyeCareMinutes * 60;
+    eyeCareTriggered = false;
+
+    applyStageUI();
+    applyBaitUI();
     updateHud();
   }
 
   function persistSave() {
+    saveState.stageIdx = currentStageIdx;
+    saveState.baitIdx = currentBaitIdx;
+    saveState.prefs = {
+      sound: window.arcadeAudio.enabled,
+      bgm: window.arcadeAudio.bgmEnabled,
+      voice: window.arcadeAudio.voiceEnabled
+    };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(saveState));
     } catch (_) {}
@@ -232,11 +312,16 @@
   // ---------------- Fish Spawning ----------------
   function pickRandomFishDef() {
     const stage = STAGES[currentStageIdx];
+    const bait = BAITS[currentBaitIdx];
     const pool = window.FISH_CATALOG.filter((f) => !f.isBoss);
     const weightOf = (f) => {
       let w = f.weight;
       if (feverTimer > 0 && f.rarity >= 2) w *= 2.5;
       if (stage.boostIds.includes(f.id)) w *= 1.8;
+      if (bait.boost === 'rare' && f.rarity >= 2) w *= 1.65;
+      if (bait.boost === 'deep' && (f.id === 'treasure' || f.id === 'narwhal' || f.id === 'baby_shark' || f.id === 'octopus')) {
+        w *= 2.0;
+      }
       return w;
     };
     const totalWeight = pool.reduce((sum, f) => sum + weightOf(f), 0);
@@ -449,8 +534,31 @@
     const totalReward = baseReward + comboBonus;
     saveState.stars += totalReward;
     const newRankIdx = getRankIndex(saveState.stars);
+
+    // Wordless 3-fish mini-quest -> Cute Ocean Sticker reward!
+    saveState.questProgress = (saveState.questProgress || 0) + 1;
+    let earnedSticker = null;
+    if (saveState.questProgress >= 3) {
+      saveState.questProgress = 0;
+      const unowned = STICKER_POOL.filter((s) => !saveState.stickers.includes(s));
+      const pool = unowned.length > 0 ? unowned : STICKER_POOL;
+      earnedSticker = pool[Math.floor(Math.random() * pool.length)];
+      if (!saveState.stickers.includes(earnedSticker)) {
+        saveState.stickers.push(earnedSticker);
+      }
+      saveState.stars += 15;
+    }
+
     persistSave();
     updateHud(true);
+
+    if (earnedSticker) {
+      setTimeout(() => {
+        window.arcadeAudio.playStickerReward();
+        showBanner(`🎁 任務完成！獲得 ${earnedSticker} 貼紙！+15⭐`, 'rankup', 3.0);
+        particles.addConfetti(width / 2, height * 0.25, 50);
+      }, 950);
+    }
 
     // Fever meter progress
     if (feverTimer <= 0) {
@@ -570,11 +678,190 @@
     const caughtCount = Object.keys(saveState.caught).length;
     albumProgressEl.textContent = `${caughtCount}/${window.FISH_CATALOG.length}`;
     feverFillEl.style.width = `${Math.min(100, feverCharge)}%`;
+
+    // Wordless 3-fish mini-quest dots
+    const q = Math.min(3, saveState.questProgress || 0);
+    questDotsEl.textContent = '🐟'.repeat(q) + '⚪'.repeat(3 - q);
   }
 
-  // ---------------- Fish Album Modal ----------------
+  // ---------------- Fish Album & Interactive Mini Aquarium ----------------
+  let aquariumActive = false;
+  let aquariumFishes = [];
+  let aquariumFoods = [];
+  let aquariumHearts = [];
+
+  function initAquarium() {
+    aquariumFoods = [];
+    aquariumHearts = [];
+    const unlockedDefs = window.FISH_CATALOG.filter((d) => (saveState.caught[d.id] || 0) > 0);
+    const list = unlockedDefs.length > 0 ? unlockedDefs : [window.FISH_CATALOG[0]];
+    aquariumFishes = list.map((def, idx) => ({
+      def,
+      x: 70 + ((idx * 113) % 460),
+      y: 75 + ((idx * 67) % 210),
+      dir: idx % 2 === 0 ? 1 : -1,
+      speed: 45 + (idx % 4) * 14,
+      phase: Math.random() * Math.PI * 2,
+      happyTimer: 0
+    }));
+  }
+
+  function updateAndDrawAquarium(dt) {
+    if (!aquariumActive) return;
+    const aw = aquariumCanvas.width;
+    const ah = aquariumCanvas.height;
+
+    const grad = aquariumCtx.createLinearGradient(0, 0, 0, ah);
+    grad.addColorStop(0, '#4fc3f7');
+    grad.addColorStop(0.6, '#0288d1');
+    grad.addColorStop(1, '#01579b');
+    aquariumCtx.fillStyle = grad;
+    aquariumCtx.fillRect(0, 0, aw, ah);
+
+    // Sand & seaweeds inside mini-tank
+    aquariumCtx.fillStyle = '#ffe082';
+    aquariumCtx.fillRect(0, ah - 34, aw, 34);
+    for (let i = 0; i < 6; i++) {
+      const sx = 55 + i * 98;
+      aquariumCtx.strokeStyle = i % 2 === 0 ? '#26a69a' : '#43a047';
+      aquariumCtx.lineWidth = 9;
+      aquariumCtx.lineCap = 'round';
+      aquariumCtx.beginPath();
+      aquariumCtx.moveTo(sx, ah - 24);
+      aquariumCtx.quadraticCurveTo(sx + Math.sin(time * 2.4 + i) * 14, ah - 68, sx, ah - 105);
+      aquariumCtx.stroke();
+    }
+
+    // Update & draw fish food pellets
+    for (let i = aquariumFoods.length - 1; i >= 0; i--) {
+      const fd = aquariumFoods[i];
+      fd.y += 28 * dt;
+      fd.x += Math.sin(time * 4 + i) * 8 * dt;
+      aquariumCtx.fillStyle = fd.color;
+      aquariumCtx.beginPath();
+      aquariumCtx.arc(fd.x, fd.y, 6, 0, Math.PI * 2);
+      aquariumCtx.fill();
+      aquariumCtx.strokeStyle = '#ffffff';
+      aquariumCtx.lineWidth = 2;
+      aquariumCtx.stroke();
+      if (fd.y > ah - 34) aquariumFoods.splice(i, 1);
+    }
+
+    // Update & draw aquarium fish (swim toward food!)
+    aquariumFishes.forEach((af) => {
+      af.phase += dt * 3.8;
+      if (af.happyTimer > 0) af.happyTimer -= dt;
+
+      if (aquariumFoods.length > 0) {
+        let nearest = aquariumFoods[0];
+        let bestD = Infinity;
+        aquariumFoods.forEach((fd) => {
+          const d = Math.hypot(fd.x - af.x, fd.y - af.y);
+          if (d < bestD) {
+            bestD = d;
+            nearest = fd;
+          }
+        });
+        const dx = nearest.x - af.x;
+        const dy = nearest.y - af.y;
+        af.dir = dx >= 0 ? 1 : -1;
+        af.x += (dx / Math.max(1, bestD)) * 135 * dt;
+        af.y += (dy / Math.max(1, bestD)) * 135 * dt;
+
+        if (bestD < 26) {
+          const fi = aquariumFoods.indexOf(nearest);
+          if (fi !== -1) aquariumFoods.splice(fi, 1);
+          af.happyTimer = 1.2;
+          aquariumHearts.push({ x: af.x, y: af.y - 24, life: 1.0 });
+          window.arcadeAudio.playCreatureGiggle();
+        }
+      } else {
+        af.x += af.dir * af.speed * dt;
+        af.y += Math.sin(af.phase) * 14 * dt;
+        if (af.x < 42) af.dir = 1;
+        if (af.x > aw - 42) af.dir = -1;
+        af.y = Math.max(46, Math.min(ah - 64, af.y));
+      }
+
+      aquariumCtx.save();
+      aquariumCtx.translate(af.x, af.y);
+      if (af.dir < 0) aquariumCtx.scale(-1, 1);
+      window.drawCreature(aquariumCtx, af.def.id, {
+        size: Math.min(46, af.def.size * 0.82),
+        time: time + af.phase,
+        excited: af.happyTimer > 0
+      });
+      aquariumCtx.restore();
+    });
+
+    // Floating hearts when fish eat food!
+    for (let i = aquariumHearts.length - 1; i >= 0; i--) {
+      const h = aquariumHearts[i];
+      h.y -= 38 * dt;
+      h.life -= dt;
+      aquariumCtx.save();
+      aquariumCtx.globalAlpha = Math.max(0, h.life);
+      aquariumCtx.font = '24px sans-serif';
+      aquariumCtx.textAlign = 'center';
+      aquariumCtx.fillText('❤️', h.x, h.y);
+      aquariumCtx.restore();
+      if (h.life <= 0) aquariumHearts.splice(i, 1);
+    }
+  }
+
+  function setAlbumTab(mode) {
+    const isAq = mode === 'aquarium';
+    aquariumActive = isAq;
+    tabAlbumGridEl.classList.toggle('active', !isAq);
+    tabAquariumEl.classList.toggle('active', isAq);
+    albumGridEl.classList.toggle('hidden', isAq);
+    aquariumViewEl.classList.toggle('hidden', !isAq);
+    if (isAq) {
+      initAquarium();
+      window.arcadeAudio.playBoop(660);
+    } else {
+      window.arcadeAudio.playBoop(520);
+    }
+  }
+
+  tabAlbumGridEl.addEventListener('click', () => setAlbumTab('grid'));
+  tabAquariumEl.addEventListener('click', () => setAlbumTab('aquarium'));
+
+  aquariumCanvas.addEventListener('pointerdown', (e) => {
+    const rect = aquariumCanvas.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * aquariumCanvas.width;
+    const y = ((e.clientY - rect.top) / rect.height) * aquariumCanvas.height;
+    const foodColors = ['#ffeb3b', '#ff8a65', '#69f0ae', '#ff80ab'];
+    for (let i = 0; i < 3; i++) {
+      aquariumFoods.push({
+        x: x + (Math.random() - 0.5) * 26,
+        y: y + (Math.random() - 0.5) * 14,
+        color: foodColors[Math.floor(Math.random() * foodColors.length)]
+      });
+    }
+    window.arcadeAudio.playFeedPlop();
+  });
+
+  function renderStickerShelf() {
+    stickerListEl.innerHTML = '';
+    if (!saveState.stickers || saveState.stickers.length === 0) {
+      const em = document.createElement('span');
+      em.className = 'sticker-empty';
+      em.textContent = '釣 3 隻魚就能收集可愛貼紙喔！';
+      stickerListEl.appendChild(em);
+    } else {
+      saveState.stickers.forEach((st) => {
+        const sp = document.createElement('span');
+        sp.textContent = st;
+        stickerListEl.appendChild(sp);
+      });
+    }
+  }
+
   function openAlbum() {
     window.arcadeAudio.playBoop(560);
+    renderStickerShelf();
+    setAlbumTab('grid');
     albumGridEl.innerHTML = '';
 
     window.FISH_CATALOG.forEach((def) => {
@@ -676,6 +963,20 @@
 
     btnToggleMotion.classList.toggle('active', motionEnabled);
     btnToggleMotion.querySelector('.opt-state').textContent = motionEnabled ? '開啟' : '關閉';
+
+    const ecOn = saveState.eyeCareMinutes > 0;
+    btnToggleEyecare.classList.toggle('active', ecOn);
+    btnToggleEyecare.querySelector('.opt-state').textContent = ecOn ? `${saveState.eyeCareMinutes} 分鐘` : '關閉';
+  }
+
+  function disarmResetBtn() {
+    if (resetConfirmTimer) {
+      clearTimeout(resetConfirmTimer);
+      resetConfirmTimer = null;
+    }
+    btnResetSave.classList.remove('confirm-armed');
+    btnResetSave.querySelector('span:first-child').textContent = '🗑️ 重置星星與圖鑑';
+    btnResetSave.querySelector('.opt-state').textContent = '重置';
   }
 
   btnParentSettings.addEventListener('pointerdown', (e) => {
@@ -693,22 +994,26 @@
   btnParentSettings.addEventListener('pointercancel', cancelParentHold);
 
   btnParentClose.addEventListener('click', () => {
+    disarmResetBtn();
     parentModalEl.classList.add('hidden');
     window.arcadeAudio.playBoop(460);
   });
 
   btnToggleSound.addEventListener('click', () => {
     window.arcadeAudio.toggleSound();
+    persistSave();
     syncParentButtons();
   });
 
   btnToggleBgm.addEventListener('click', () => {
     window.arcadeAudio.toggleBgm();
+    persistSave();
     syncParentButtons();
   });
 
   btnToggleVoice.addEventListener('click', () => {
     window.arcadeAudio.toggleVoice();
+    persistSave();
     syncParentButtons();
   });
 
@@ -717,8 +1022,48 @@
     syncParentButtons();
   });
 
+  btnToggleEyecare.addEventListener('click', () => {
+    const idx = EYECARE_PRESETS.indexOf(saveState.eyeCareMinutes);
+    saveState.eyeCareMinutes = EYECARE_PRESETS[(idx + 1) % EYECARE_PRESETS.length];
+    eyeCareRemainingSec = saveState.eyeCareMinutes * 60;
+    eyeCareTriggered = false;
+    persistSave();
+    syncParentButtons();
+    window.arcadeAudio.playBoop(560);
+  });
+
+  btnGoodnightMore.addEventListener('click', () => {
+    eyeCareRemainingSec = 5 * 60;
+    eyeCareTriggered = false;
+    goodnightModalEl.classList.add('hidden');
+    window.arcadeAudio.playBoop(620);
+    showBanner('⏰ 再玩 5 分鐘喔！', '', 2.2);
+  });
+
+  btnGoodnightClose.addEventListener('click', () => {
+    saveState.eyeCareMinutes = 0;
+    eyeCareRemainingSec = 0;
+    eyeCareTriggered = false;
+    persistSave();
+    goodnightModalEl.classList.add('hidden');
+    window.arcadeAudio.playBoop(500);
+  });
+
   btnResetSave.addEventListener('click', () => {
-    saveState = { stars: 0, caught: {}, recentBasket: [] };
+    if (!btnResetSave.classList.contains('confirm-armed')) {
+      btnResetSave.classList.add('confirm-armed');
+      btnResetSave.querySelector('span:first-child').textContent = '⚠️ 再點一次確認清空！';
+      btnResetSave.querySelector('.opt-state').textContent = '確認';
+      window.arcadeAudio.playBoop(340);
+      resetConfirmTimer = setTimeout(disarmResetBtn, 4000);
+      return;
+    }
+    disarmResetBtn();
+    saveState.stars = 0;
+    saveState.caught = {};
+    saveState.recentBasket = [];
+    saveState.questProgress = 0;
+    saveState.stickers = [];
     comboCount = 0;
     comboBadgeEl.classList.add('hidden');
     persistSave();
@@ -760,6 +1105,17 @@
       return;
     }
 
+    if (particles.tryTapClam(px, py, height, width)) {
+      window.arcadeAudio.playPearlChime();
+      zapCharge = Math.min(100, zapCharge + 12);
+      return;
+    }
+
+    if (particles.tryTapSeagull(px, py, STAGES[currentStageIdx].id)) {
+      window.arcadeAudio.playSeagull();
+      return;
+    }
+
     for (const f of fishes) {
       const dx = px - f.x;
       const dy = py - f.y;
@@ -774,8 +1130,10 @@
       }
     }
 
+    // Protect active fish bite (nibble) from accidental recast!
+    const isNibbling = fishes.some((f) => f.state === 'nibble');
     swipeStart = { x: px, y: py, t: performance.now() };
-    if (phase === 'idle' || phase === 'waiting') {
+    if (phase === 'idle' || (phase === 'waiting' && !isNibbling)) {
       castLine(px, py);
     }
   });
@@ -787,8 +1145,9 @@
     const py = e.clientY - rect.top;
     const dy = swipeStart.y - py;
     const dt = performance.now() - swipeStart.t;
+    const isNibbling = fishes.some((f) => f.state === 'nibble');
 
-    if (dy > 60 && dt < 400 && (phase === 'idle' || phase === 'waiting')) {
+    if (dy > 60 && dt < 400 && (phase === 'idle' || (phase === 'waiting' && !isNibbling))) {
       castLine(px, waterSurfaceY + 80 + Math.random() * (height * 0.45));
     }
     swipeStart = null;
@@ -800,13 +1159,25 @@
     window.arcadeAudio.unlock();
     currentStageIdx = (currentStageIdx + 1) % STAGES.length;
     const st = STAGES[currentStageIdx];
-    stageIconEl.textContent = st.icon;
-    stageNameEl.textContent = st.name;
+    applyStageUI();
+    persistSave();
     window.arcadeAudio.playFeverStart();
     particles.addConfetti(width * 0.2, height * 0.78, 22);
     showBanner(`${st.icon} 來到 ${st.name}！`, '', 2.0);
     window.arcadeAudio.speak(`出發！來到${st.name}囉！`);
     populateOcean();
+  });
+
+  // Fun Bait Switcher Button (3 Free Baits!)
+  btnBaitSwitch.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    window.arcadeAudio.unlock();
+    currentBaitIdx = (currentBaitIdx + 1) % BAITS.length;
+    const b = BAITS[currentBaitIdx];
+    applyBaitUI();
+    persistSave();
+    window.arcadeAudio.playBoop(640);
+    showBanner(`${b.icon} 換上 ${b.name}！${b.desc}`, '', 1.9);
   });
 
   // Giant Pulsing Cast Button
@@ -941,8 +1312,19 @@
   btnCatchOk.addEventListener('click', closeCatchModal);
   btnAlbum.addEventListener('click', openAlbum);
   btnAlbumClose.addEventListener('click', () => {
+    aquariumActive = false;
     albumModalEl.classList.add('hidden');
     window.arcadeAudio.playBoop(460);
+  });
+
+  // Auto-pause BGM & audio when tab hidden / screen locked!
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      window.arcadeAudio.pauseForBackground();
+    } else {
+      lastTime = performance.now();
+      window.arcadeAudio.resumeFromBackground();
+    }
   });
 
   // ---------------- Update Loop ----------------
@@ -984,6 +1366,16 @@
       if (bossCooldown <= 0) {
         bossCooldown = 34 + Math.random() * 14;
         triggerBossEvent();
+      }
+    }
+
+    // Parent Eye-Care Timer countdown (triggers gently on idle)
+    if (started && saveState.eyeCareMinutes > 0 && !eyeCareTriggered) {
+      eyeCareRemainingSec -= dt;
+      if (eyeCareRemainingSec <= 0 && phase === 'idle' && goodnightModalEl.classList.contains('hidden')) {
+        eyeCareTriggered = true;
+        goodnightModalEl.classList.remove('hidden');
+        window.arcadeAudio.speak('小魚要去睡覺囉！今天釣魚好棒，讓眼睛休息一下吧！');
       }
     }
 
@@ -1052,6 +1444,13 @@
         f.y += (targetY - f.y) * Math.min(1, dt * 6);
         f.dir = struggleX >= 0 ? 1 : -1;
 
+        if (Math.random() < dt * 7) {
+          particles.addSwimBubble(f.x - f.dir * f.def.size * 0.5, f.y);
+        }
+        if (Math.random() < dt * 3.2) {
+          particles.addSandPuff(width * 0.5 + (Math.random() - 0.5) * 220, height - 36, 2);
+        }
+
         rodBend += ((f.x - width / 2) / (width * 0.4) - rodBend) * Math.min(1, dt * 8);
         continue;
       }
@@ -1104,6 +1503,9 @@
       const boost = f.tapTimer > 0 ? 2.2 : 1.0;
       f.x += f.dir * f.speed * boost * dt;
       f.y = f.baseY + Math.sin(f.phase) * 14;
+      if (Math.random() < dt * (boost > 1 ? 4.5 : 0.45)) {
+        particles.addSwimBubble(f.x - f.dir * f.def.size * 0.55, f.y);
+      }
 
       if ((f.dir === 1 && f.x > width + f.def.size * 2.5) ||
           (f.dir === -1 && f.x < -f.def.size * 2.5)) {
@@ -1115,7 +1517,8 @@
       rodBend *= Math.max(0, 1 - dt * 6);
     }
 
-    particles.update(dt, width, height, waterSurfaceY);
+    particles.update(dt, width, height, waterSurfaceY, STAGES[currentStageIdx].id);
+    updateAndDrawAquarium(dt);
   }
 
   // ---------------- Render Loop ----------------
@@ -1156,6 +1559,9 @@
       }
     }
 
+    // Stage-specific sun, moon, seagulls, sailboat, shooting stars, & Fever rainbow!
+    particles.drawSkyExtras(ctx, width, waterSurfaceY, time, stage.id, feverTimer > 0);
+
     const seaGrad = ctx.createLinearGradient(0, waterSurfaceY, 0, height);
     if (feverTimer > 0) {
       seaGrad.addColorStop(0, '#26c6da');
@@ -1169,7 +1575,20 @@
     ctx.fillStyle = seaGrad;
     ctx.fillRect(0, waterSurfaceY, width, height - waterSurfaceY);
 
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+    // Double-layered 3D ocean waves + shimmering surface sparkles!
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+    ctx.beginPath();
+    ctx.moveTo(0, waterSurfaceY);
+    for (let x = 0; x <= width; x += 24) {
+      const y = waterSurfaceY - 3 + Math.sin(x * 0.02 - time * 2.2) * 5;
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(width, waterSurfaceY + 14);
+    ctx.lineTo(0, waterSurfaceY + 14);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.42)';
     ctx.beginPath();
     ctx.moveTo(0, waterSurfaceY);
     for (let x = 0; x <= width; x += 24) {
@@ -1180,6 +1599,14 @@
     ctx.lineTo(0, waterSurfaceY + 16);
     ctx.closePath();
     ctx.fill();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
+    for (let i = 0; i < 6; i++) {
+      const gx = ((i * 193 + time * 22) % Math.max(1, width));
+      const gy = waterSurfaceY + 6 + (i % 2) * 5;
+      const gw = 10 + Math.abs(Math.sin(time * 3.4 + i)) * 16;
+      ctx.fillRect(gx, gy, gw, 2.5);
+    }
   }
 
   function drawFishingRodAndLine() {
@@ -1243,6 +1670,19 @@
         ctx.beginPath();
         ctx.arc(-4, -5, 3.5, 0, Math.PI * 2);
         ctx.fill();
+
+        // Draw selected fun bait hanging gently beneath the bobber!
+        if (phase === 'waiting') {
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(0, 14);
+          ctx.lineTo(0, 32);
+          ctx.stroke();
+          ctx.font = '20px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(BAITS[currentBaitIdx].icon, Math.sin(time * 4) * 2.5, 46);
+        }
         ctx.restore();
       }
     }
@@ -1284,7 +1724,16 @@
     }
 
     drawWaterBackground();
-    particles.drawBackgroundDetails(ctx, width, height, waterSurfaceY, time, feverTimer > 0);
+    particles.drawBackgroundDetails(
+      ctx,
+      width,
+      height,
+      waterSurfaceY,
+      time,
+      feverTimer > 0,
+      STAGES[currentStageIdx].id,
+      phase === 'reeling'
+    );
 
     // Zero-reading water cast target cue when idle!
     if (started && phase === 'idle') {
@@ -1338,4 +1787,10 @@
   loadSave();
   populateOcean();
   requestAnimationFrame(loop);
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
 })();

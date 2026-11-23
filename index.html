@@ -7,6 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#29b6f6">
   <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='40' fill='%2329b6f6'/><text x='90' y='124' font-size='104' text-anchor='middle'>🎣</text></svg>">
   <title>歡樂釣魚大冒險 🎣</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
@@ -56,7 +57,13 @@
           </div>
           <span id="fever-x2-tag" class="fever-x2-tag hidden">x2!</span>
         </div>
-        <div id="combo-badge" class="combo-badge hidden">🔥 2 連釣！</div>
+        <div class="hud-sub-row">
+          <div id="quest-pill" class="quest-pill" title="釣 3 隻魚拿可愛海洋貼紙！">
+            <span id="quest-dots">⚪⚪⚪</span>
+            <span class="quest-gift">🎁</span>
+          </div>
+          <div id="combo-badge" class="combo-badge hidden">🔥 2 連釣！</div>
+        </div>
       </div>
 
       <div class="hud-right">
@@ -81,13 +88,19 @@
       <div class="banner-text" id="event-banner-text">咬鉤了！</div>
     </div>
 
-    <!-- Idle Cast Controls: Stage Switcher + Rod Tag + Giant Pulsing Cast Button -->
+    <!-- Idle Cast Controls: Stage Switcher + Bait Switcher + Rod Tag + Giant Pulsing Cast Button -->
     <div id="idle-controls" class="idle-controls">
       <div class="idle-left-stack">
-        <button id="btn-stage-switch" class="arcade-btn stage-btn" aria-label="切換海洋地圖">
-          <span id="stage-icon">🏝️</span>
-          <span id="stage-name">陽光珊瑚海</span>
-        </button>
+        <div class="idle-btn-row">
+          <button id="btn-stage-switch" class="arcade-btn stage-btn" aria-label="切換海洋地圖">
+            <span id="stage-icon">🏝️</span>
+            <span id="stage-name">陽光珊瑚海</span>
+          </button>
+          <button id="btn-bait-switch" class="arcade-btn bait-btn" aria-label="切換魚餌">
+            <span id="bait-icon">🦐</span>
+            <span id="bait-name">小蝦米</span>
+          </button>
+        </div>
         <div class="rod-tag" id="rod-tag">🪵 木頭小釣竿</div>
       </div>
       <button id="btn-big-cast" class="big-cast-btn" aria-label="拋竿釣魚">
@@ -152,14 +165,25 @@
       </div>
     </div>
 
-    <!-- Fish Album / My Aquarium Modal -->
+    <!-- Fish Album / Interactive Mini Aquarium Modal -->
     <div id="album-modal" class="modal-overlay hidden">
       <div class="album-card">
         <div class="album-header">
-          <h2>🐠 我的海洋圖鑑</h2>
+          <div class="album-tabs">
+            <button id="tab-album-grid" class="album-tab-btn active">📖 海洋圖鑑</button>
+            <button id="tab-aquarium" class="album-tab-btn">🐠 互動水族箱</button>
+          </div>
           <button id="btn-album-close" class="arcade-btn close-btn" aria-label="關閉">✖</button>
         </div>
+        <div id="sticker-shelf" class="sticker-shelf">
+          <span class="sticker-label">🏅 海洋貼紙：</span>
+          <div id="sticker-list" class="sticker-list"></div>
+        </div>
         <div class="album-grid" id="album-grid"></div>
+        <div id="aquarium-view" class="aquarium-view hidden">
+          <canvas id="aquarium-canvas" width="600" height="360"></canvas>
+          <p class="aquarium-tip">👆 點一下水族箱灑飼料，小魚會游過來吃喔！</p>
+        </div>
       </div>
     </div>
 
@@ -188,9 +212,32 @@
             <span>📱 手機體感甩竿</span>
             <span class="opt-state">關閉</span>
           </button>
+          <button id="btn-toggle-eyecare" class="parent-opt-btn">
+            <span>⏰ 護眼休息計時</span>
+            <span class="opt-state">關閉</span>
+          </button>
           <button id="btn-reset-save" class="parent-opt-btn danger">
             <span>🗑️ 重置星星與圖鑑</span>
             <span class="opt-state">重置</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Goodnight Eye-Care Rest Overlay -->
+    <div id="goodnight-modal" class="modal-overlay hidden">
+      <div class="goodnight-card">
+        <div class="goodnight-moon">🌙✨</div>
+        <h2 class="goodnight-title">小魚要去睡覺囉！</h2>
+        <p class="goodnight-desc">今天釣魚好棒喔！讓眼睛和海洋朋友一起休息一下吧 💤</p>
+        <div class="goodnight-actions">
+          <button id="btn-goodnight-more" class="parent-opt-btn active">
+            <span>⏰ 家長允許：再玩 5 分鐘</span>
+            <span class="opt-state">+5m</span>
+          </button>
+          <button id="btn-goodnight-close" class="parent-opt-btn">
+            <span>✅ 關閉計時並繼續</span>
+            <span class="opt-state">關閉</span>
           </button>
         </div>
       </div>

@@ -1112,3 +1112,205 @@ html, body {
   .reel-outer-ring { width: 140px; height: 140px; }
   .reel-wheel { width: 106px; height: 106px; }
 }
+
+
+/* =========================================================
+   v3 Upgrades: Bait Pill, Mini-Quest, Interactive Aquarium,
+   Sticker Shelf, Confirm Reset, & Cozy Goodnight Overlay
+   ========================================================= */
+
+.hud-sub-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.quest-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 3px solid #ffd54f;
+  border-radius: 999px;
+  padding: 3px 12px;
+  font-size: 16px;
+  font-weight: 900;
+  color: #e65100;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.16);
+}
+
+.quest-gift {
+  font-size: 18px;
+  animation: giftWiggle 2.2s infinite ease-in-out;
+}
+
+@keyframes giftWiggle {
+  0%, 80%, 100% { transform: rotate(0deg); }
+  85% { transform: rotate(-14deg) scale(1.12); }
+  92% { transform: rotate(14deg) scale(1.12); }
+}
+
+.idle-btn-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bait-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #fff8e1 0%, #ffe082 100%);
+  border: 3px solid #ffffff;
+  color: #e65100;
+  font-size: 16px;
+  font-weight: 900;
+  box-shadow: 0 5px 0 #f57c00, 0 8px 16px rgba(0, 0, 0, 0.22);
+}
+
+.bait-btn:active {
+  transform: translateY(3px) scale(0.96);
+  box-shadow: 0 2px 0 #f57c00;
+}
+
+.album-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.album-tab-btn {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 3px solid #b3e5fc;
+  background: #e1f5fe;
+  color: #0277bd;
+  font-size: 17px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.album-tab-btn.active {
+  background: linear-gradient(180deg, #29b6f6 0%, #0288d1 100%);
+  border-color: #ffffff;
+  color: #ffffff;
+  box-shadow: 0 4px 10px rgba(2, 136, 209, 0.35);
+}
+
+.sticker-shelf {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: #fff8e1;
+  border: 3px solid #ffe082;
+  border-radius: 18px;
+  padding: 8px 14px;
+  margin-bottom: 12px;
+}
+
+.sticker-label {
+  font-size: 15px;
+  font-weight: 900;
+  color: #ef6c00;
+}
+
+.sticker-list {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 24px;
+}
+
+.sticker-empty {
+  font-size: 14px;
+  font-weight: 700;
+  color: #8d6e63;
+}
+
+.aquarium-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.aquarium-view.hidden {
+  display: none;
+}
+
+#aquarium-canvas {
+  width: 100%;
+  max-width: 600px;
+  height: auto;
+  aspect-ratio: 5 / 3;
+  border-radius: 22px;
+  border: 5px solid #4fc3f7;
+  box-shadow: inset 0 0 24px rgba(1, 87, 155, 0.35), 0 8px 20px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+  touch-action: none;
+}
+
+.aquarium-tip {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #0277bd;
+  text-align: center;
+}
+
+.parent-opt-btn.confirm-armed {
+  background: #d32f2f;
+  border-color: #ffeb3b;
+  color: #ffffff;
+  animation: pulseReset 0.7s infinite alternate;
+}
+
+@keyframes pulseReset {
+  from { transform: scale(1); }
+  to { transform: scale(1.02); }
+}
+
+.goodnight-card {
+  width: min(92vw, 440px);
+  background: linear-gradient(180deg, #1a237e 0%, #311b92 100%);
+  border: 6px solid #fff59d;
+  border-radius: 32px;
+  padding: 28px 24px;
+  text-align: center;
+  color: #ffffff;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.45);
+  animation: popIn 0.35s cubic-bezier(0.2, 1.25, 0.4, 1);
+}
+
+.goodnight-moon {
+  font-size: 64px;
+  margin-bottom: 6px;
+}
+
+.goodnight-title {
+  margin: 0 0 10px;
+  font-size: 32px;
+  font-weight: 900;
+  color: #fff59d;
+}
+
+.goodnight-desc {
+  margin: 0 0 20px;
+  font-size: 18px;
+  line-height: 1.5;
+  color: #e8eaf6;
+}
+
+.goodnight-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
