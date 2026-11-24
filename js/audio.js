@@ -115,6 +115,17 @@ class ArcadeAudio {
     this.vibrate([50, 30, 50, 30, 140]);
   }
 
+  playLeap() {
+    this.playTone(340, 0.28, 'sine', 0.18, 920);
+    this.playSplash(0.02);
+  }
+
+  playParadeChime() {
+    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+      this.playTone(f, 0.12, 'sine', 0.16, null, i * 0.07);
+    });
+  }
+
   vibrate(pattern) {
     if (!this.enabled) return;
     if (navigator.vibrate) {

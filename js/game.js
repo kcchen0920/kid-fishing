@@ -59,10 +59,18 @@
   const catchFishCtx = catchFishCanvas.getContext('2d');
   const catchStarsEl = document.getElementById('catch-stars');
   const catchNewBadgeEl = document.getElementById('catch-new-badge');
+  const catchRecordBadgeEl = document.getElementById('catch-record-badge');
   const catchNameEl = document.getElementById('catch-name');
+  const catchSizeTagEl = document.getElementById('catch-size-tag');
   const catchFunLineEl = document.getElementById('catch-fun-line');
   const catchRewardStarsEl = document.getElementById('catch-reward-stars');
   const btnCatchOk = document.getElementById('btn-catch-ok');
+
+  const treasureModalEl = document.getElementById('treasure-modal');
+  const treasureHintEl = document.getElementById('treasure-hint');
+  const btnTreasureTap = document.getElementById('btn-treasure-tap');
+  const treasureEmojiEl = document.getElementById('treasure-emoji');
+  const treasureTapsLeftEl = document.getElementById('treasure-taps-left');
 
   const albumModalEl = document.getElementById('album-modal');
   const albumGridEl = document.getElementById('album-grid');
@@ -165,6 +173,7 @@
   let saveState = {
     stars: 0,
     caught: {},
+    bestSize: {},
     recentBasket: [], // latest 4 fish IDs
     stageIdx: 0,
     baitIdx: 0,
@@ -205,6 +214,7 @@
         const parsed = JSON.parse(raw);
         saveState.stars = parsed.stars || 0;
         saveState.caught = parsed.caught || {};
+        saveState.bestSize = parsed.bestSize && typeof parsed.bestSize === 'object' ? parsed.bestSize : {};
         saveState.recentBasket = Array.isArray(parsed.recentBasket) ? parsed.recentBasket : [];
         saveState.stageIdx = Number.isInteger(parsed.stageIdx) ? parsed.stageIdx % STAGES.length : 0;
         saveState.baitIdx = Number.isInteger(parsed.baitIdx) ? parsed.baitIdx % BAITS.length : 0;
@@ -285,7 +295,19 @@
   let feverCharge = 0;
   let feverTimer = 0;
   let bossCooldown = 22;
+  let paradeCooldown = 17;
   let bannerTimer = 0;
+
+  // Splash Leap & Tap-to-Open Treasure State
+  let leapingFish = null; // { def, sizeScale, cm, isJumbo, startX, startY, t }
+  let pendingTreasureCatch = null;
+  let treasureTaps = 0;
+  const TREASURE_TOYS = [
+    { icon: '👑', name: '黃金皇冠' },
+    { icon: '🦆', name: '黃色小鴨' },
+    { icon: '💎', name: '彩虹鑽石' },
+    { icon: '🍦', name: '海洋冰淇淋' }
+  ];
 
   // Motion Sensor
   let motionEnabled = false;
@@ -333,15 +355,20 @@
     return pool[0];
   }
 
-  function spawnFish(defOverride = null, fromEdge = true) {
+  function spawnFish(defOverride = null, fromEdge = true, posOverride = null) {
     const def = defOverride || pickRandomFishDef();
-    const dir = Math.random() < 0.5 ? 1 : -1;
+    const dir = posOverride ? posOverride.dir : (Math.random() < 0.5 ? 1 : -1);
     const minY = waterSurfaceY + height * def.depthRange[0] * 0.75;
     const maxY = Math.min(height - 70, waterSurfaceY + height * def.depthRange[1] * 0.85);
-    const y = minY + Math.random() * Math.max(20, maxY - minY);
-    const x = fromEdge
-      ? (dir === 1 ? -def.size * 1.5 : width + def.size * 1.5)
-      : 60 + Math.random() * (width - 120);
+    const y = posOverride ? posOverride.y : (minY + Math.random() * Math.max(20, maxY - minY));
+    const x = posOverride
+      ? posOverride.x
+      : (fromEdge ? (dir === 1 ? -def.size * 1.5 : width + def.size * 1.5) : 60 + Math.random() * (width - 120));
+
+    // Playful random size (18% chance of sparkling Jumbo fish!)
+    const isJumbo = !def.isBoss && def.id !== 'treasure' && Math.random() < 0.18;
+    const sizeScale = isJumbo ? (1.24 + Math.random() * 0.14) : (0.86 + Math.random() * 0.24);
+    const cm = Math.round(def.size * sizeScale * (def.isBoss ? 2.4 : 0.75));
 
     fishes.push({
       def,
@@ -349,6 +376,9 @@
       y,
       baseY: y,
       dir,
+      sizeScale,
+      isJumbo,
+      cm,
       speed: (55 + Math.random() * 45) * def.speed,
       phase: Math.random() * Math.PI * 2,
       state: 'swim',
@@ -357,6 +387,27 @@
       puffed: 0,
       tapTimer: 0
     });
+  }
+
+  function triggerParadeEvent() {
+    const paradeChoices = ['clownfish', 'blue_tang', 'goldfish', 'jellyfish'];
+    const pickId = paradeChoices[Math.floor(Math.random() * paradeChoices.length)];
+    const def = window.FISH_BY_ID[pickId];
+    if (!def) return;
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    const centerY = waterSurfaceY + height * (0.28 + Math.random() * 0.28);
+    for (let i = 0; i < 5; i++) {
+      const offsetX = (dir === 1 ? -1 : 1) * (def.size * 1.4 + i * 56);
+      const startX = (dir === 1 ? 0 : width) + offsetX;
+      const offsetY = (i % 2 === 0 ? -1 : 1) * Math.ceil(i / 2) * 28;
+      spawnFish(def, true, {
+        x: startX,
+        y: Math.max(waterSurfaceY + 40, Math.min(height - 90, centerY + offsetY)),
+        dir
+      });
+    }
+    showBanner(`🐟 ${def.name}大遊行來囉！`, '', 2.4);
+    window.arcadeAudio.playParadeChime();
   }
 
   function populateOcean() {
@@ -401,7 +452,7 @@
 
   // ---------------- Core Fishing Flow ----------------
   function castLine(targetX, targetY) {
-    if (!started || phase === 'reeling' || phase === 'caught') return;
+    if (!started || phase === 'reeling' || phase === 'caught' || phase === 'leaping') return;
 
     const clampedX = Math.max(50, Math.min(width - 50, targetX));
     const clampedY = Math.max(waterSurfaceY + 26, Math.min(height - 95, targetY));
@@ -502,12 +553,41 @@
     const caught = hookedFish;
     const def = caught.def;
 
-    phase = 'caught';
+    // Launch joyful Splash Leap animation before modal!
+    phase = 'leaping';
     hookedFish = null;
     arcadeControlsEl.classList.add('hidden');
 
     const idx = fishes.indexOf(caught);
     if (idx !== -1) fishes.splice(idx, 1);
+
+    leapingFish = {
+      def,
+      sizeScale: caught.sizeScale || 1,
+      cm: caught.cm || Math.round(def.size * 0.75),
+      isJumbo: !!caught.isJumbo,
+      startX: caught.x,
+      startY: caught.y,
+      t: 0
+    };
+    window.arcadeAudio.playLeap();
+    particles.addSplash(caught.x, waterSurfaceY + 10, 36, '#ffffff');
+  }
+
+  function openTreasureMiniGame(catchInfo) {
+    phase = 'caught';
+    pendingTreasureCatch = catchInfo;
+    treasureTaps = 0;
+    treasureEmojiEl.textContent = '🎁';
+    treasureHintEl.textContent = '點點寶箱打開它！';
+    treasureTapsLeftEl.textContent = '⚪ ⚪ ⚪';
+    treasureModalEl.classList.remove('hidden');
+    window.arcadeAudio.speak('哇！是黃金大寶箱！快點點它打開來！');
+  }
+
+  function finishCatchPresentation(catchInfo, extraTreasureBonus = 0, extraFunLine = null) {
+    const { def, cm, isJumbo } = catchInfo;
+    phase = 'caught';
 
     // Combo Streak!
     comboCount++;
@@ -520,18 +600,22 @@
 
     // Celebration particles & Flying Stars into HUD!
     const isTreasure = def.id === 'treasure';
-    particles.addSplash(caught.x, waterSurfaceY + 10, isTreasure ? 48 : 32, isTreasure ? '#fff176' : '#ffffff');
     particles.addConfetti(width / 2, height * 0.42, (def.isBoss || isTreasure) ? 95 : 55);
     particles.addFlyingStars(width / 2, height * 0.45, 70, 34, (def.isBoss || isTreasure) ? 14 : 6);
 
-    // Update Save & Check Rank Up!
+    // Update Save, Personal Size Record & Check Rank Up!
     const oldRankIdx = getRankIndex(saveState.stars);
     const isNew = !saveState.caught[def.id];
+    const prevBest = saveState.bestSize[def.id] || 0;
+    const isRecord = !isNew && cm > prevBest;
+    if (cm > prevBest) saveState.bestSize[def.id] = cm;
+
     saveState.caught[def.id] = (saveState.caught[def.id] || 0) + 1;
     saveState.recentBasket = [def.id, ...saveState.recentBasket].slice(0, 4);
 
+    const jumboBonus = isJumbo ? 10 : 0;
     const baseReward = feverTimer > 0 ? def.stars * 2 : def.stars;
-    const totalReward = baseReward + comboBonus;
+    const totalReward = baseReward + comboBonus + jumboBonus + extraTreasureBonus;
     saveState.stars += totalReward;
     const newRankIdx = getRankIndex(saveState.stars);
 
@@ -560,13 +644,11 @@
       }, 950);
     }
 
-    // Fever meter progress
     if (feverTimer <= 0) {
       feverCharge = Math.min(100, feverCharge + 22);
       feverFillEl.style.width = `${feverCharge}%`;
     }
 
-    // Play fanfare & joyful Mandarin voice!
     if (newRankIdx > oldRankIdx) {
       const nr = RANKS[newRankIdx];
       window.arcadeAudio.playRankUp();
@@ -575,13 +657,13 @@
         window.arcadeAudio.speak(`哇！太棒了！你升級成${nr.title}，拿到新釣竿囉！`);
       }, 450);
     } else {
-      if (def.id === 'treasure') {
+      if (isTreasure) {
         window.arcadeAudio.playTreasureJackpot();
       } else {
         window.arcadeAudio.playCatchFanfare(def.rarity >= 3);
       }
       setTimeout(() => {
-        window.arcadeAudio.speak(def.voiceLine);
+        window.arcadeAudio.speak(isJumbo ? `哇！超大隻的${def.name}！太厲害了！` : def.voiceLine);
       }, 350);
     }
 
@@ -589,8 +671,10 @@
     catchPreviewFish = def;
     catchStarsEl.textContent = '⭐'.repeat(Math.min(4, def.rarity));
     catchNewBadgeEl.classList.toggle('hidden', !isNew);
-    catchNameEl.textContent = def.name;
-    catchFunLineEl.textContent = def.funLine;
+    catchRecordBadgeEl.classList.toggle('hidden', !isRecord);
+    catchNameEl.textContent = isJumbo ? `🌟 超大${def.name}` : def.name;
+    catchSizeTagEl.textContent = `📏 ${cm} 公分${isJumbo ? '（巨無霸！）' : ''}`;
+    catchFunLineEl.textContent = extraFunLine || def.funLine;
     catchRewardStarsEl.textContent = totalReward;
     catchModalEl.classList.remove('hidden');
   }
@@ -1061,6 +1145,7 @@
     disarmResetBtn();
     saveState.stars = 0;
     saveState.caught = {};
+    saveState.bestSize = {};
     saveState.recentBasket = [];
     saveState.questProgress = 0;
     saveState.stickers = [];
@@ -1310,6 +1395,34 @@
   });
 
   btnCatchOk.addEventListener('click', closeCatchModal);
+
+  // Interactive Tap-to-Open Treasure Chest!
+  btnTreasureTap.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    if (!pendingTreasureCatch) return;
+    window.arcadeAudio.unlock();
+    treasureTaps++;
+    btnTreasureTap.classList.add('shake');
+    setTimeout(() => btnTreasureTap.classList.remove('shake'), 160);
+    window.arcadeAudio.playBoop(520 + treasureTaps * 140);
+    particles.addConfetti(width / 2, height / 2, 24);
+
+    if (treasureTaps < 3) {
+      treasureTapsLeftEl.textContent = '⭐ '.repeat(treasureTaps) + '⚪ '.repeat(3 - treasureTaps);
+    } else {
+      const toy = TREASURE_TOYS[Math.floor(Math.random() * TREASURE_TOYS.length)];
+      treasureEmojiEl.textContent = toy.icon;
+      treasureHintEl.textContent = `打開了！拿到 ${toy.name}！`;
+      treasureTapsLeftEl.textContent = '⭐ ⭐ ⭐';
+      window.arcadeAudio.playTreasureJackpot();
+      const info = pendingTreasureCatch;
+      pendingTreasureCatch = null;
+      setTimeout(() => {
+        treasureModalEl.classList.add('hidden');
+        finishCatchPresentation(info, 30, `寶箱裡藏著 ${toy.icon} ${toy.name}！額外送 +30⭐！`);
+      }, 900);
+    }
+  });
   btnAlbum.addEventListener('click', openAlbum);
   btnAlbumClose.addEventListener('click', () => {
     aquariumActive = false;
@@ -1361,11 +1474,36 @@
       }
     }
 
-    if (started && phase !== 'caught') {
+    if (started && phase !== 'caught' && phase !== 'leaping') {
       bossCooldown -= dt;
       if (bossCooldown <= 0) {
         bossCooldown = 34 + Math.random() * 14;
         triggerBossEvent();
+      }
+      paradeCooldown -= dt;
+      if (paradeCooldown <= 0) {
+        paradeCooldown = 26 + Math.random() * 14;
+        triggerParadeEvent();
+      }
+    }
+
+    // Arcade Splash Leap Animation!
+    if (phase === 'leaping' && leapingFish) {
+      leapingFish.t += dt * 1.55;
+      if (Math.random() < dt * 24) {
+        const lt = leapingFish.t;
+        const lx = leapingFish.startX + (width / 2 - leapingFish.startX) * lt;
+        const ly = leapingFish.startY * (1 - lt) + (waterSurfaceY - 40) * lt - Math.sin(lt * Math.PI) * 180;
+        particles.addSplash(lx, ly, 2, '#e1f5fe');
+      }
+      if (leapingFish.t >= 1) {
+        const info = leapingFish;
+        leapingFish = null;
+        if (info.def.id === 'treasure') {
+          openTreasureMiniGame(info);
+        } else {
+          finishCatchPresentation(info);
+        }
       }
     }
 
@@ -1748,16 +1886,41 @@
         ctx.rotate(Math.sin(time * 24) * 0.16);
       }
       window.drawCreature(ctx, f.def.id, {
-        size: f.def.size,
+        size: f.def.size * (f.sizeScale || 1),
         time: time + f.phase,
         puffed: f.puffed,
         excited: f.state === 'hooked' || f.state === 'curious' || f.tapTimer > 0,
         shocked: f.state === 'hooked' && shockTimer > 0
       });
+      if (f.isJumbo && f.state !== 'hooked') {
+        ctx.font = '18px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('✨', 0, -(f.def.size * (f.sizeScale || 1)) * 0.65);
+      }
       ctx.restore();
     });
 
     drawFishingRodAndLine();
+
+    // Render Leaping Fish soaring out of water!
+    if (phase === 'leaping' && leapingFish) {
+      const lt = leapingFish.t;
+      const lx = leapingFish.startX + (width / 2 - leapingFish.startX) * lt;
+      const ly = leapingFish.startY * (1 - lt) + (waterSurfaceY - 40) * lt - Math.sin(lt * Math.PI) * 180;
+      ctx.save();
+      ctx.translate(lx, ly);
+      ctx.rotate(-0.6 + lt * 1.4);
+      const scalePop = 1 + Math.sin(lt * Math.PI) * 0.35;
+      ctx.scale(scalePop, scalePop);
+      window.drawCreature(ctx, leapingFish.def.id, {
+        size: leapingFish.def.size * (leapingFish.sizeScale || 1),
+        time,
+        puffed: leapingFish.def.id === 'puffer' ? 0.8 : 0,
+        excited: true
+      });
+      ctx.restore();
+    }
+
     particles.drawForegroundEffects(ctx);
     ctx.restore();
 

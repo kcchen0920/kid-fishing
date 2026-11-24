@@ -154,9 +154,13 @@
     <div id="catch-modal" class="modal-overlay hidden">
       <div class="catch-card">
         <div class="catch-stars" id="catch-stars">⭐⭐⭐</div>
-        <div class="catch-badge hidden" id="catch-new-badge">✨ 新發現！</div>
+        <div class="catch-badges-row">
+          <div class="catch-badge hidden" id="catch-new-badge">✨ 新發現！</div>
+          <div class="catch-badge record-badge hidden" id="catch-record-badge">🏆 破紀錄！</div>
+        </div>
         <canvas id="catch-fish-canvas" width="260" height="200"></canvas>
         <h2 class="catch-title" id="catch-name">小丑魚</h2>
+        <div class="catch-size-tag" id="catch-size-tag">📏 28 公分</div>
         <p class="catch-subtitle" id="catch-fun-line">好棒喔！</p>
         <div class="catch-reward">
           <span>+</span><span id="catch-reward-stars">10</span><span> ⭐</span>
@@ -240,6 +244,17 @@
             <span class="opt-state">關閉</span>
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- Interactive Tap-to-Open Treasure Chest Overlay -->
+    <div id="treasure-modal" class="modal-overlay hidden">
+      <div class="treasure-card">
+        <div class="treasure-hint" id="treasure-hint">點點寶箱打開它！</div>
+        <button id="btn-treasure-tap" class="treasure-tap-btn" aria-label="點擊打開寶箱">
+          <span id="treasure-emoji">🎁</span>
+        </button>
+        <div class="treasure-taps-left" id="treasure-taps-left">⚪ ⚪ ⚪</div>
       </div>
     </div>
 
